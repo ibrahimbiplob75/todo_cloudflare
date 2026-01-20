@@ -13,6 +13,7 @@
 	"observability": {
 		"enabled": true
 	},
+	"compatibility_flags": ["nodejs_compat"],
 	// ✅ D1 DATABASE BINDING
 	"d1_databases": [
 		{

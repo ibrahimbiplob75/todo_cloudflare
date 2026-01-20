@@ -1,0 +1,105 @@
+### Authentication API Tests
+### Base URL - Update this to match your server URL
+@baseUrl = http://localhost:5173
+@token = eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsImVtYWlsIjoibXlwaG90bzI4OEBnbWFpbC5jb20iLCJuYW1lIjoic2hlZmF0IiwiaWF0IjoxNzY4OTIxNzI3LCJleHAiOjE3NjkwMDgxMjd9.fKauZgtT2ny20x1_GZuwrS7Dv5pPRHKLZVczGb7tmXU
+
+### Variables
+@email = myphoto288@gmail.com
+@password = 11221122
+@invalidEmail = wrong@email.com
+@invalidPassword = wrongpassword
+
+###############################################
+### POST /auth/login - User Login
+###############################################
+
+### 1. Login with valid credentials
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+### 2. Login with invalid email
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{invalidEmail}}",
+  "password": "{{password}}"
+}
+
+### 3. Login with invalid password
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{invalidPassword}}"
+}
+
+### 4. Login with missing email
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "password": "{{password}}"
+}
+
+### 5. Login with missing password
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}"
+}
+
+### 6. Login with empty body
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{}
+
+###############################################
+### GET /auth/profile - Get Authenticated User Profile
+###############################################
+
+### 7. Get profile with valid token (Update @token after successful login)
+GET {{baseUrl}}/auth/profile
+Authorization: Bearer {{token}}
+
+### 8. Get profile without token
+GET {{baseUrl}}/auth/profile
+
+### 9. Get profile with invalid token
+GET {{baseUrl}}/auth/profile
+Authorization: Bearer invalid.token.here
+
+### 10. Get profile with expired token (if you have one)
+GET {{baseUrl}}/auth/profile
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsImVtYWlsIjoibXlwaG90bzI4OEBnbWFpbC5jb20iLCJuYW1lIjoic2hlZmF0IiwiaWF0IjoxNzM3MzYwMDAwLCJleHAiOjE3MzczNjAwMDB9.invalid
+
+### 11. Get profile with malformed Authorization header
+GET {{baseUrl}}/auth/profile
+Authorization: {{token}}
+
+###############################################
+### Test Flow: Login then Get Profile
+###############################################
+
+### Step 1: Login and copy the token from response
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+### Step 2: Use the token from login response (manually update @token variable above)
+# Or use this if your HTTP client supports response variables:
+# GET {{baseUrl}}/auth/profile
+# Authorization: Bearer {{login.response.body.token}}

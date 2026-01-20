@@ -2,6 +2,7 @@ import { createPrismaClient } from './prisma.js';
 import { handleUserRoutes } from './routes/userRoutes.js';
 import { handleTodoRoutes } from './routes/todoRoutes.js';
 import { handleApiRoutes } from './routes/apiRoutes.js';
+import { handleAuthRoutes } from './routes/authRoutes.js';
 
 export default {
 	async fetch(request, env) {
@@ -26,11 +27,15 @@ export default {
 		const apiResponse = await handleApiRoutes(request, corsHeaders);
 		if (apiResponse) return apiResponse;
 
-		// 2. User routes
+		// 2. Auth routes
+		const authResponse = await handleAuthRoutes(request, prisma, corsHeaders, env);
+		if (authResponse) return authResponse;
+
+		// 3. User routes
 		const userResponse = await handleUserRoutes(request, prisma, corsHeaders);
 		if (userResponse) return userResponse;
 
-		// 3. Todo routes
+		// 4. Todo routes
 		const todoResponse = await handleTodoRoutes(request, prisma, corsHeaders);
 		if (todoResponse) return todoResponse;
 
