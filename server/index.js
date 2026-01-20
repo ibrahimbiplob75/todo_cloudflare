@@ -3,6 +3,7 @@ import { handleUserRoutes } from './routes/userRoutes.js';
 import { handleTodoRoutes } from './routes/todoRoutes.js';
 import { handleApiRoutes } from './routes/apiRoutes.js';
 import { handleAuthRoutes } from './routes/authRoutes.js';
+import { handleProjectRoutes } from './routes/projectRoutes.js';
 
 export default {
 	async fetch(request, env) {
@@ -35,7 +36,11 @@ export default {
 		const userResponse = await handleUserRoutes(request, prisma, corsHeaders);
 		if (userResponse) return userResponse;
 
-		// 4. Todo routes
+		// 4. Project routes
+		const projectResponse = await handleProjectRoutes(request, prisma, corsHeaders, env);
+		if (projectResponse) return projectResponse;
+
+		// 5. Todo routes
 		const todoResponse = await handleTodoRoutes(request, prisma, corsHeaders);
 		if (todoResponse) return todoResponse;
 

@@ -1,0 +1,191 @@
+### Project Management API Tests
+### Base URL - Update this to match your server URL
+@baseUrl = http://localhost:5173
+@token = 
+@projectId = 
+
+### Variables
+@userId = 1
+
+###############################################
+### Authentication (Required for most endpoints)
+###############################################
+
+### Login to get token
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "myphoto288@gmail.com",
+  "password": "11221122"
+}
+
+### Update token variable after login (copy from response)
+# @token = <paste-token-here>
+
+###############################################
+### GET /project - List All Projects
+###############################################
+
+### 1. List all projects (without auth - shows all)
+GET {{baseUrl}}/project
+
+### 2. List all projects (with auth - filters by creator)
+GET {{baseUrl}}/project
+Authorization: Bearer {{token}}
+
+###############################################
+### POST /project/create - Create New Project
+###############################################
+
+### 3. Create project with title and description
+# @name createProject
+POST {{baseUrl}}/project/create
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "My First Project",
+  "description": "This is a test project description"
+}
+
+### 4. Create project with only title
+POST {{baseUrl}}/project/create
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Simple Project"
+}
+
+### 5. Create project without authentication (should fail)
+POST {{baseUrl}}/project/create
+Content-Type: application/json
+
+{
+  "title": "Unauthorized Project",
+  "description": "This should fail"
+}
+
+### 6. Create project with missing title (should fail)
+POST {{baseUrl}}/project/create
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "description": "Missing title"
+}
+
+###############################################
+### GET /project/{id} - Get Single Project
+###############################################
+
+### 7. Get project by ID (Update @projectId from create response)
+GET {{baseUrl}}/project/{{projectId}}
+
+### 8. Get non-existent project (should return 404)
+GET {{baseUrl}}/project/99999
+
+### 9. Get project with invalid ID (should return error)
+GET {{baseUrl}}/project/invalid
+
+###############################################
+### POST /project/{id}/update - Update Project
+###############################################
+
+### 10. Update project title and description
+POST {{baseUrl}}/project/{{projectId}}/update
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Updated Project Title",
+  "description": "Updated description"
+}
+
+### 11. Update only project title
+POST {{baseUrl}}/project/{{projectId}}/update
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "New Title Only"
+}
+
+### 12. Update only project description
+POST {{baseUrl}}/project/{{projectId}}/update
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "description": "New description only"
+}
+
+### 13. Update project without authentication (should fail)
+POST {{baseUrl}}/project/{{projectId}}/update
+Content-Type: application/json
+
+{
+  "title": "Unauthorized Update"
+}
+
+### 14. Update non-existent project (should return 404)
+POST {{baseUrl}}/project/99999/update
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Non-existent Project"
+}
+
+###############################################
+### POST /project/{id}/delete - Delete Project
+###############################################
+
+### 15. Delete project (Update @projectId)
+POST {{baseUrl}}/project/{{projectId}}/delete
+Authorization: Bearer {{token}}
+
+### 16. Delete project without authentication (should fail)
+POST {{baseUrl}}/project/{{projectId}}/delete
+
+### 17. Delete non-existent project (should return 404)
+POST {{baseUrl}}/project/99999/delete
+Authorization: Bearer {{token}}
+
+### 18. Delete project with invalid ID (should return error)
+POST {{baseUrl}}/project/invalid/delete
+Authorization: Bearer {{token}}
+
+###############################################
+### Complete Workflow Test
+###############################################
+
+### Step 1: Create a project
+# @name workflowCreate
+POST {{baseUrl}}/project/create
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Workflow Test Project",
+  "description": "Testing complete CRUD workflow"
+}
+
+### Step 2: Get the created project (copy id from response above)
+# GET {{baseUrl}}/project/<id-from-step-1>
+
+### Step 3: Update the project
+# POST {{baseUrl}}/project/<id-from-step-1>/update
+# Authorization: Bearer {{token}}
+# Content-Type: application/json
+#
+# {
+#   "title": "Updated Workflow Project",
+#   "description": "Updated description"
+# }
+
+### Step 4: Delete the project
+# POST {{baseUrl}}/project/<id-from-step-1>/delete
+# Authorization: Bearer {{token}}

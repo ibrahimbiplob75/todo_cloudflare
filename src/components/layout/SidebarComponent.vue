@@ -3,7 +3,7 @@
   <div
     v-if="sidebarOpen"
     @click="closeSidebar"
-    class="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden transition-opacity"
+    class="fixed inset-0 bg-[rgba(0,0,0,0.5)] bg-opacity-50 z-40 md:hidden transition-opacity"
   ></div>
 
   <!-- Sidebar -->
@@ -60,7 +60,7 @@ export default {
       navigationItems: [
         { name: 'dashboard', label: 'Home', to: '/dashboard', icon: 'fa-home' },
         { name: 'profile', label: 'Profile', to: '/profile', icon: 'fa-user' },
-        { name: 'project', label: 'Project', to: '#', icon: 'fa-folder', disabled: true },
+        { name: 'project', label: 'Projects', to: '/projects', icon: 'fa-folder', disabled: false },
         { name: 'todo', label: 'Todo', to: '#', icon: 'fa-tasks', disabled: true },
       ],
     }
@@ -96,7 +96,15 @@ export default {
       }
     },
     isActive(route) {
-      return this.$route.path === route
+      // Exact match
+      if (this.$route.path === route) return true
+      
+      // For projects routes, check if path starts with /projects
+      if (route === '/projects' && this.$route.path.startsWith('/projects')) {
+        return true
+      }
+      
+      return false
     },
   },
 }

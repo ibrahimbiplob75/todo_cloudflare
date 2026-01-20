@@ -29,6 +29,30 @@ const router = createRouter({
       meta: { middleware: 'private', layout: 'private' },
     },
     {
+      path: '/projects',
+      name: 'projects-all',
+      component: () => import('../views/dashboard/projects/all.vue'),
+      meta: { middleware: 'private', layout: 'private' },
+    },
+    {
+      path: '/projects/create',
+      name: 'project-create',
+      component: () => import('../views/dashboard/projects/create.vue'),
+      meta: { middleware: 'private', layout: 'private' },
+    },
+    {
+      path: '/projects/:id',
+      name: 'project-view',
+      component: () => import('../views/dashboard/projects/view.vue'),
+      meta: { middleware: 'private', layout: 'private' },
+    },
+    {
+      path: '/projects/:id/update',
+      name: 'project-update',
+      component: () => import('../views/dashboard/projects/update.vue'),
+      meta: { middleware: 'private', layout: 'private' },
+    },
+    {
       path: '/',
       redirect: '/login',
     },
