@@ -12,7 +12,15 @@
 	},
 	"observability": {
 		"enabled": true
-	}
+	},
+	// ✅ D1 DATABASE BINDING
+	"d1_databases": [
+		{
+		  "binding": "todo_db",
+		  "database_name": "todo",
+		  "database_id": "95e2c2c7-cc63-4663-80ea-1d691b535b26"
+		}
+	]
 	/**
 	 * Smart Placement
 	 * https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement

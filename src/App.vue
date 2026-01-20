@@ -1,25 +1,40 @@
 <script setup>
-import { RouterLink, RouterView } from 'vue-router'
-import HelloWorld from './components/HelloWorld.vue'
-import { ref } from 'vue'
+import { RouterLink, RouterView } from "vue-router";
+import HelloWorld from "./components/HelloWorld.vue";
+import { ref } from "vue";
 
-const name = ref('Unknown')
+const name = ref("Unknown");
 
 const getName = async () => {
-  const res = await fetch('/api/')
-  const data = await res.json()
-  name.value = data.name
-}
+  const res = await fetch("/api/");
+  const data = await res.json();
+  name.value = data.name;
+};
+
+const getTodos = async () => {
+  const res = await fetch("/api/todos");
+  const data = await res.json();
+  todos.value = data.todos;
+};
 </script>
 
 <template>
   <header>
-    <img alt="Vue logo" class="logo" src="@/assets/logo.svg" width="125" height="125" />
+    <img
+      alt="Vue logo"
+      class="logo"
+      src="@/assets/logo.svg"
+      width="125"
+      height="125"
+    />
 
     <div class="wrapper">
       <HelloWorld msg="You did it!" />
       <button class="green" @click="getName" aria-label="get name">
         Name from API is: {{ name }}
+      </button>
+      <button class="green" @click="getTodos" aria-label="get todos">
+        Todos from API is: {{ todos }}
       </button>
       <p>Edit <code>server/index.js</code> to change what the API gets</p>
       <nav>
