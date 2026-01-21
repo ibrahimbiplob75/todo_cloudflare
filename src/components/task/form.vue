@@ -36,13 +36,17 @@
         <select
           id="projectId"
           v-model="formData.projectId"
-          class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+          :disabled="isSubtask"
+          class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
         >
           <option :value="null">No Project</option>
           <option v-for="project in projects" :key="project.id" :value="project.id">
             {{ project.title }}
           </option>
         </select>
+        <p v-if="isSubtask" class="mt-1 text-xs text-gray-500">
+          Inherited from parent task
+        </p>
       </div>
 
       <div>
@@ -158,12 +162,17 @@
 
 <script>
 import { useProjectStore } from '@stores/project'
+import { useTaskStore } from '@stores/task'
 
 export default {
   name: 'TaskForm',
   props: {
     task: {
       type: Object,
+      default: null,
+    },
+    parentTaskId: {
+      type: Number,
       default: null,
     },
     loading: {
@@ -198,17 +207,42 @@ export default {
         comment: '',
       },
       errors: {},
+      parentTask: null,
     }
   },
   computed: {
     projectStore() {
       return useProjectStore()
     },
+    taskStore() {
+      return useTaskStore()
+    },
     projects() {
       return this.projectStore.projects || []
     },
+    isSubtask() {
+      return this.parentTaskId !== null && this.parentTaskId !== undefined
+    },
   },
   watch: {
+    parentTaskId: {
+      immediate: true,
+      async handler(newParentTaskId) {
+        if (newParentTaskId && !this.task) {
+          // Fetch parent task to get its projectId
+          await this.fetchParentTask()
+        }
+      },
+    },
+    parentTask: {
+      immediate: true,
+      handler(newParentTask) {
+        if (newParentTask && this.isSubtask && !this.task) {
+          // Set projectId from parent task (only when creating new subtask, not editing)
+          this.formData.projectId = newParentTask.projectId || null
+        }
+      },
+    },
     task: {
       immediate: true,
       handler(newTask) {
@@ -225,10 +259,15 @@ export default {
             comment: newTask.comment || '',
           }
         } else {
+          // If creating new subtask, inherit projectId from parent
+          const inheritedProjectId = this.isSubtask && this.parentTask 
+            ? this.parentTask.projectId || null 
+            : null
+          
           this.formData = {
             title: '',
             description: '',
-            projectId: null,
+            projectId: inheritedProjectId,
             priority: 'mid',
             taskStatus: 'pending',
             submissionDate: '',
@@ -245,8 +284,25 @@ export default {
     if (this.projects.length === 0) {
       await this.projectStore.fetchProjects()
     }
+    
+    // If parentTaskId is provided and we don't have parent task yet, fetch it
+    if (this.parentTaskId && !this.parentTask) {
+      await this.fetchParentTask()
+    }
   },
   methods: {
+    async fetchParentTask() {
+      if (!this.parentTaskId) return
+      
+      try {
+        const result = await this.taskStore.fetchTaskById(this.parentTaskId)
+        if (result.success) {
+          this.parentTask = result.data
+        }
+      } catch (error) {
+        console.error('Error fetching parent task:', error)
+      }
+    },
     formatDateTimeLocal(dateString) {
       if (!dateString) return ''
       const date = new Date(dateString)
@@ -277,10 +333,17 @@ export default {
       }
 
       // Prepare data for submission
+      // For subtasks, use parent's projectId if not explicitly set
+      let projectId = this.formData.projectId || null
+      if (this.isSubtask && this.parentTask && !projectId) {
+        projectId = this.parentTask.projectId || null
+      }
+      
       const submitData = {
         title: this.formData.title.trim(),
         description: this.formData.description?.trim() || null,
-        projectId: this.formData.projectId || null,
+        projectId: projectId,
+        parentTaskId: this.parentTaskId || null,
         priority: this.formData.priority,
         taskStatus: this.formData.taskStatus,
         submissionDate: this.formData.submissionDate || null,

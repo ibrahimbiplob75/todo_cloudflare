@@ -1,5 +1,5 @@
 <template>
-  <div class="h-screen flex flex-col relative bg-gray-50">
+  <div class="h-[calc(100vh-115px)] flex flex-col relative bg-gray-50">
     <!-- Top Bar -->
     <div class="h-14 flex items-center justify-between px-4 border-b border-gray-200 bg-white">
       <div class="font-semibold text-lg text-gray-800">

@@ -12,7 +12,9 @@ export default defineConfig({
 	plugins: [
 		vue(),
 		vueDevTools(),
-		cloudflare()
+		cloudflare({
+			configPath: './wrangler.jsonc'
+		})
 	],
 	resolve: {
 		alias: {
@@ -30,24 +32,9 @@ export default defineConfig({
 			'@prisma/client',
 			'@prisma/adapter-d1',
 			'/.prisma/client',
-			'.prisma/client',
-			'@prisma/client/runtime',
-			'@prisma/client/runtime/library',
 		],
 		resolve: {
-			external: [], // Don't externalize Prisma
-		},
-	},
-	build: {
-		rollupOptions: {
-			output: {
-				manualChunks: undefined, // Ensure Prisma is bundled correctly
-			},
-			// Disable tree-shaking completely to preserve all Prisma models
-			treeshake: false,
-			// Preserve all Prisma client code
-			preserveEntrySignatures: 'strict',
-			external: [], // Don't externalize anything
+			external: [],
 		},
 	},
 	optimizeDeps: {

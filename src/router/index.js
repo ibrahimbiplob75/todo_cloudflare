@@ -71,6 +71,18 @@ const router = createRouter({
       meta: { middleware: 'private', layout: 'private' },
     },
     {
+      path: '/tasks/:id/sub-tasks',
+      name: 'task-subtasks',
+      component: () => import('@views/dashboard/tasks/subtasks.vue'),
+      meta: { middleware: 'private', layout: 'private' },
+    },
+    {
+      path: '/tasks/:id/sub-tasks/create',
+      name: 'task-subtasks-create',
+      component: () => import('@views/dashboard/tasks/subtasks-create.vue'),
+      meta: { middleware: 'private', layout: 'private' },
+    },
+    {
       path: '/',
       redirect: '/login',
     },

@@ -1,13 +1,5 @@
 import * as taskService from '../services/taskService.js';
 import { extractTokenFromRequest, verifyToken } from '../services/authService.js';
-import { PrismaClient } from '@prisma/client';
-
-// Force reference to taskModel at module level to prevent tree-shaking
-// This ensures TaskModel is included in Cloudflare Workers bundle
-let _taskModelRef = null;
-if (typeof PrismaClient !== 'undefined') {
-	_taskModelRef = 'taskModel';
-}
 
 /**
  * Task Routes Handler
@@ -30,29 +22,6 @@ export async function handleTaskRoutes(request, prisma, corsHeaders, env = {}) {
 	// GET /task - List all tasks (with optional filters)
 	if (pathname === "/task" && method === 'GET') {
 		try {
-			// Debug: Check prisma and task model
-			if (!prisma) {
-				return Response.json(
-					{ error: 'Prisma client is not initialized' },
-					{ status: 500, headers: corsHeaders }
-				);
-			}
-			
-		if (!prisma.taskModel) {
-			const availableModels = Object.keys(prisma).filter(key => 
-				!key.startsWith('_') && 
-				!key.startsWith('$') && 
-				typeof prisma[key] === 'object' &&
-				prisma[key] !== null
-			);
-			console.error('TaskModel not available in route handler');
-			console.error('Available models:', availableModels);
-			return Response.json(
-				{ error: `TaskModel not available. Available: ${availableModels.join(', ')}` },
-				{ status: 500, headers: corsHeaders }
-			);
-		}
-			
 			const userId = await getUserId();
 			const searchParams = url.searchParams;
 			
@@ -76,6 +45,11 @@ export async function handleTaskRoutes(request, prisma, corsHeaders, env = {}) {
 			
 			if (searchParams.has('priority')) {
 				filters.priority = searchParams.get('priority');
+			}
+			
+			if (searchParams.has('parent_task_id')) {
+				const parentTaskId = searchParams.get('parent_task_id');
+				filters.parentTaskId = parentTaskId === 'null' ? null : parseInt(parentTaskId);
 			}
 			
 			const result = await taskService.listTasks(prisma, filters);
@@ -203,6 +177,30 @@ export async function handleTaskRoutes(request, prisma, corsHeaders, env = {}) {
 		);
 	}
 
+	// GET /task/{id}/subtasks - Get all subtasks for a task
+	const getSubtasksMatch = pathname.match(/^\/task\/(\d+)\/subtasks$/);
+	if (getSubtasksMatch && method === 'GET') {
+		try {
+			const taskId = getSubtasksMatch[1];
+			const result = await taskService.getSubtasks(prisma, taskId);
+			
+			if (result.success) {
+				return Response.json({ subtasks: result.data }, { headers: corsHeaders });
+			}
+			
+			return Response.json(
+				{ error: result.error },
+				{ status: result.statusCode || 500, headers: corsHeaders }
+			);
+		} catch (error) {
+			console.error('Get subtasks error:', error);
+			return Response.json(
+				{ error: 'Failed to fetch subtasks' },
+				{ status: 500, headers: corsHeaders }
+			);
+		}
+	}
+
 	// POST /task/{id}/update - Update single task
 	const updateTaskMatch = pathname.match(/^\/task\/(\d+)\/update$/);
 	if (updateTaskMatch && method === 'POST') {
@@ -219,7 +217,7 @@ export async function handleTaskRoutes(request, prisma, corsHeaders, env = {}) {
 			const body = await request.json();
 			
 			// Optional: Verify user owns the task or is assigned to it
-			const existingTask = await prisma.taskModel.findUnique({
+			const existingTask = await prisma.task.findUnique({
 				where: { id: parseInt(taskId) },
 			});
 
@@ -275,7 +273,7 @@ export async function handleTaskRoutes(request, prisma, corsHeaders, env = {}) {
 			const taskId = deleteTaskMatch[1];
 			
 			// Verify user owns the task or is assigned to it
-			const existingTask = await prisma.taskModel.findUnique({
+			const existingTask = await prisma.task.findUnique({
 				where: { id: parseInt(taskId) },
 			});
 

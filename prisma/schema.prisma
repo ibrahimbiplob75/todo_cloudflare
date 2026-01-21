@@ -32,9 +32,10 @@ model Project {
   @@map("projects")
 }
 
-model TaskModel {
+model Task {
   id             Int       @id @default(autoincrement())
   projectId      Int?      @map("project_id")
+  parentTaskId   Int?      @map("parent_task_id")
   title          String
   description    String?
   priority       String    @default("mid") // low, mid, high, urgent
@@ -48,7 +49,20 @@ model TaskModel {
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
+  // Self-referential relationship
+  parentTask     Task?     @relation("TaskSubtasks", fields: [parentTaskId], references: [id], onDelete: Cascade)
+  subtasks       Task[]    @relation("TaskSubtasks")
+
   @@map("tasks")
+  @@index([projectId])
+  @@index([assignedTo])
+  @@index([taskStatus])
+  @@index([priority])
+  @@index([submissionDate])
+  @@index([parentTaskId])
+  @@index([assignedTo, taskStatus])
+  @@index([taskStatus, submissionDate])
+  @@index([projectId, taskStatus, submissionDate])
 }
 
 model Todo {

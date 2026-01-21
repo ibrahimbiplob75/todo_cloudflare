@@ -2,6 +2,7 @@
 CREATE TABLE IF NOT EXISTS "tasks" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "project_id" INTEGER,
+    "parent_task_id" INTEGER,
     "title" TEXT NOT NULL,
     "description" TEXT,
     "priority" TEXT NOT NULL DEFAULT 'mid',

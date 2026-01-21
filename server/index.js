@@ -8,32 +8,7 @@ import { handleTaskRoutes } from './routes/taskRoutes.js';
 
 export default {
 	async fetch(request, env) {
-		// Check if database binding exists
-		if (!env.todo_db) {
-			return new Response(
-				JSON.stringify({ error: 'Database binding not found' }),
-				{ status: 500, headers: { 'Content-Type': 'application/json' } }
-			);
-		}
-		
 		const prisma = createPrismaClient(env.todo_db);
-		
-		// CRITICAL: Force access to taskModel immediately after creation
-		// This must be done BEFORE any route handlers to ensure it's bundled
-		// Access it in a way that can't be optimized away
-		try {
-			// Force property access - this creates a reference the bundler can't remove
-			const _taskModelCheck = 'taskModel' in prisma;
-			const _taskModelAccess = prisma['taskModel'];
-			const _taskModelDot = prisma.taskModel;
-			
-			// Store references to force inclusion
-			if (_taskModelDot) {
-				prisma._ensureTaskModel = _taskModelDot;
-			}
-		} catch (e) {
-			// Ignore - taskModel might not be available yet
-		}
 
 		// CORS headers
 		const corsHeaders = {

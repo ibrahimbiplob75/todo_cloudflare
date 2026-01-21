@@ -1,9 +1,63 @@
 ### Task Management API Tests
 ### Base URL - Update this to match your server URL
 @baseUrl = http://localhost:5173
-@token = 
+@token = eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsImVtYWlsIjoibXlwaG90bzI4OEBnbWFpbC5jb20iLCJuYW1lIjoic2hlZmF0IiwiaWF0IjoxNzY4OTIxNzI3LCJleHAiOjE3NjkwMDgxMjd9.fKauZgtT2ny20x1_GZuwrS7Dv5pPRHKLZVczGb7tmXU
+
 @taskId = 
 @projectId = 1
+@parentTaskId = 
+
+### ============================================
+### SUBTASKS API TESTS
+### ============================================
+
+### Test 100: Get subtasks for a task
+GET {{baseUrl}}/task/{{taskId}}/subtasks
+Authorization: Bearer {{token}}
+
+### Test 101: Create task with parent_task_id (subtask)
+POST {{baseUrl}}/task/create
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Subtask Example",
+  "description": "This is a subtask",
+  "projectId": {{projectId}},
+  "parentTaskId": {{taskId}},
+  "priority": "mid",
+  "taskStatus": "pending"
+}
+
+### Test 102: Create task without parent (top-level task)
+POST {{baseUrl}}/task/create
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Top Level Task",
+  "description": "This is a top-level task",
+  "projectId": {{projectId}},
+  "priority": "high",
+  "taskStatus": "pending"
+}
+
+### Test 103: Update task to add parent_task_id
+POST {{baseUrl}}/task/{{taskId}}/update
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "parentTaskId": {{parentTaskId}}
+}
+
+### Test 104: List tasks with parent_task_id filter (get all top-level tasks)
+GET {{baseUrl}}/task?parent_task_id=null
+Authorization: Bearer {{token}}
+
+### Test 105: List tasks with specific parent_task_id (get subtasks)
+GET {{baseUrl}}/task?parent_task_id={{taskId}}
+Authorization: Bearer {{token}}
 
 ### Variables
 @userId = 1

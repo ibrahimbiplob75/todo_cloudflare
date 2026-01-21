@@ -2,19 +2,6 @@
  * Task Service - Handles all task-related database operations
  */
 
-// CRITICAL: Import and reference PrismaClient at module level
-// This forces the bundler to include all Prisma models including taskModel
-import { PrismaClient } from '@prisma/client';
-
-/**
- * Force reference to taskModel property name at module level
- * This creates a static reference that the bundler must preserve
- */
-const TASK_MODEL_PROPERTY = 'taskModel';
-
-// Create a reference that can't be optimized away
-const _taskModelKey = TASK_MODEL_PROPERTY;
-
 /**
  * Calculate duration in minutes between two dates
  * @param {Date} startDate - Start date
@@ -34,35 +21,16 @@ function calculateDuration(startDate, endDate) {
  * @returns {Promise<Array>} Array of tasks
  */
 export async function listTasks(prisma, filters = {}) {
-	if (!prisma) {
-		return { success: false, error: 'Prisma client is not initialized', statusCode: 500 };
-	}
-	
-	// Debug: Check if taskModel exists - try multiple access methods
-	const taskModelAccess = prisma[_taskModelKey] || prisma.taskModel || prisma['taskModel'];
-	
-	if (!taskModelAccess) {
-		const availableModels = Object.keys(prisma).filter(key => 
-			!key.startsWith('_') && 
-			!key.startsWith('$') && 
-			typeof prisma[key] === 'object' &&
-			prisma[key] !== null
-		);
-		console.error('Prisma client does not have taskModel');
-		console.error('Tried accessing via:', ['taskModel', _taskModelKey, 'taskModel']);
-		console.error('Available models:', availableModels);
-		return { 
-			success: false, 
-			error: `Prisma taskModel not available. Available models: ${availableModels.join(', ')}. This is a bundling issue - taskModel is being tree-shaken out.`, 
-			statusCode: 500 
-		};
-	}
-	
-	// Use the accessed taskModel
-	const taskModel = taskModelAccess;
-	
 	try {
 		const where = {};
+		
+		// By default, only show top-level tasks (no parent)
+		if (filters.parentTaskId === undefined) {
+			where.parentTaskId = null;
+		} else if (filters.parentTaskId !== null) {
+			where.parentTaskId = parseInt(filters.parentTaskId);
+		}
+		// If parentTaskId is explicitly null in filters, don't add it to where clause (show all tasks)
 		
 		if (filters.projectId !== undefined) {
 			where.projectId = filters.projectId;
@@ -80,24 +48,38 @@ export async function listTasks(prisma, filters = {}) {
 			where.priority = filters.priority;
 		}
 		
-		// Access taskModel using the key (works even if getter was tree-shaken)
-		const taskModel = prisma[_taskModelKey] || prisma.taskModel;
-		
-		if (!taskModel || typeof taskModel.findMany !== 'function') {
-			console.error('taskModel.findMany is not available');
-			return { 
-				success: false, 
-				error: 'TaskModel.findMany not available in Prisma client. This is a bundling issue.', 
-				statusCode: 500 
-			};
-		}
-		
-		const tasks = await taskModel.findMany({
+		const tasks = await prisma.task.findMany({
 			where,
 			orderBy: { createdAt: 'desc' },
+			include: {
+				subtasks: {
+					select: {
+						id: true,
+						taskStatus: true,
+					},
+				},
+			},
 		});
 		
-		return { success: true, data: tasks };
+		// Add subtask counts to each task
+		const tasksWithCounts = tasks.map(task => {
+			const subtasks = task.subtasks || [];
+			const completedSubtasks = subtasks.filter(st => st.taskStatus === 'completed').length;
+			const incompletedSubtasks = subtasks.length - completedSubtasks;
+			const completionPercent = subtasks.length > 0 
+				? Math.round((completedSubtasks / subtasks.length) * 100)
+				: 0;
+			
+			return {
+				...task,
+				totalSubTasks: subtasks.length,
+				completedSubTasks: completedSubtasks,
+				incompletedSubTasks: incompletedSubtasks,
+				completionPercent: completionPercent,
+			};
+		});
+		
+		return { success: true, data: tasksWithCounts };
 	} catch (error) {
 		console.error('Error listing tasks:', error);
 		return { success: false, error: error.message };
@@ -111,21 +93,13 @@ export async function listTasks(prisma, filters = {}) {
  * @returns {Promise<Object>} Task object
  */
 export async function getTaskById(prisma, id) {
-	if (!prisma) {
-		return { success: false, error: 'Prisma client is not initialized', statusCode: 500 };
-	}
-	
 	try {
 		const taskId = parseInt(id);
 		if (isNaN(taskId)) {
 			return { success: false, error: 'Invalid task ID' };
 		}
 
-		const taskModel = prisma[_taskModelKey] || prisma.taskModel;
-		if (!taskModel) {
-			return { success: false, error: 'TaskModel not available', statusCode: 500 };
-		}
-		const task = await taskModel.findUnique({
+		const task = await prisma.task.findUnique({
 			where: { id: taskId },
 		});
 
@@ -141,21 +115,79 @@ export async function getTaskById(prisma, id) {
 }
 
 /**
+ * Get all subtasks for a specific task
+ * @param {PrismaClient} prisma - Prisma client instance
+ * @param {number} parentTaskId - Parent task ID
+ * @returns {Promise<Object>} Array of subtasks
+ */
+export async function getSubtasks(prisma, parentTaskId) {
+	try {
+		const taskId = parseInt(parentTaskId);
+		if (isNaN(taskId)) {
+			return { success: false, error: 'Invalid task ID', statusCode: 400 };
+		}
+
+		// Verify parent task exists
+		const parentTask = await prisma.task.findUnique({
+			where: { id: taskId },
+		});
+
+		if (!parentTask) {
+			return { success: false, error: 'Parent task not found', statusCode: 404 };
+		}
+
+		// Get all subtasks (direct children only)
+		const subtasks = await prisma.task.findMany({
+			where: { parentTaskId: taskId },
+			include: {
+				subtasks: {
+					select: {
+						id: true,
+						taskStatus: true,
+					},
+				},
+			},
+			orderBy: { createdAt: 'desc' },
+		});
+
+		// Add subtask counts to each subtask
+		const subtasksWithCounts = subtasks.map(task => {
+			const subSubtasks = task.subtasks || [];
+			const completedSubtasks = subSubtasks.filter(st => st.taskStatus === 'completed').length;
+			const incompletedSubtasks = subSubtasks.length - completedSubtasks;
+			const completionPercent = subSubtasks.length > 0 
+				? Math.round((completedSubtasks / subSubtasks.length) * 100)
+				: 0;
+			
+			return {
+				...task,
+				totalSubTasks: subSubtasks.length,
+				completedSubTasks: completedSubtasks,
+				incompletedSubTasks: incompletedSubtasks,
+				completionPercent: completionPercent,
+			};
+		});
+
+		return { success: true, data: subtasksWithCounts };
+	} catch (error) {
+		console.error('Error getting subtasks:', error);
+		return { success: false, error: error.message };
+	}
+}
+
+/**
  * Create a new task
  * @param {PrismaClient} prisma - Prisma client instance
  * @param {Object} taskData - Task data
  * @returns {Promise<Object>} Created task object
  */
 export async function createTask(prisma, taskData) {
-	if (!prisma) {
-		return { success: false, error: 'Prisma client is not initialized', statusCode: 500 };
-	}
-	
 	try {
 		const {
 			title,
 			description,
 			projectId,
+			parentTaskId,
 			priority = 'mid',
 			taskStatus = 'pending',
 			submissionDate,
@@ -224,6 +256,21 @@ export async function createTask(prisma, taskData) {
 			}
 		}
 
+		// Verify parent task exists if parentTaskId is provided
+		if (parentTaskId) {
+			const parentTask = await prisma.task.findUnique({
+				where: { id: parentTaskId },
+			});
+
+			if (!parentTask) {
+				return { 
+					success: false, 
+					error: 'Parent task not found',
+					statusCode: 404 
+				};
+			}
+		}
+
 		// Calculate total duration if both execution and completion dates are provided
 		let totalDuration = null;
 		if (executionDate && completionDate) {
@@ -233,15 +280,12 @@ export async function createTask(prisma, taskData) {
 			);
 		}
 
-		const taskModel = prisma[_taskModelKey] || prisma.taskModel;
-		if (!taskModel) {
-			return { success: false, error: 'TaskModel not available', statusCode: 500 };
-		}
-		const task = await taskModel.create({
+		const task = await prisma.task.create({
 			data: {
 				title,
 				description: description || null,
 				projectId: projectId || null,
+				parentTaskId: parentTaskId || null,
 				priority,
 				taskStatus,
 				submissionDate: submissionDate ? new Date(submissionDate) : null,
@@ -269,10 +313,6 @@ export async function createTask(prisma, taskData) {
  * @returns {Promise<Object>} Updated task object
  */
 export async function updateTask(prisma, id, taskData) {
-	if (!prisma) {
-		return { success: false, error: 'Prisma client is not initialized', statusCode: 500 };
-	}
-	
 	try {
 		const taskId = parseInt(id);
 		if (isNaN(taskId)) {
@@ -280,7 +320,7 @@ export async function updateTask(prisma, id, taskData) {
 		}
 
 		// Check if task exists
-		const existingTask = await prisma.taskModel.findUnique({
+		const existingTask = await prisma.task.findUnique({
 			where: { id: taskId },
 		});
 
@@ -296,6 +336,17 @@ export async function updateTask(prisma, id, taskData) {
 		if (taskData.title !== undefined) updateData.title = taskData.title;
 		if (taskData.description !== undefined) updateData.description = taskData.description || null;
 		if (taskData.projectId !== undefined) updateData.projectId = taskData.projectId || null;
+		if (taskData.parentTaskId !== undefined) {
+			// Prevent circular reference
+			if (taskData.parentTaskId === taskId) {
+				return {
+					success: false,
+					error: 'Task cannot be its own parent',
+					statusCode: 400,
+				};
+			}
+			updateData.parentTaskId = taskData.parentTaskId || null;
+		}
 		if (taskData.priority !== undefined) {
 			const validPriorities = ['low', 'mid', 'high', 'urgent'];
 			if (!validPriorities.includes(taskData.priority)) {
@@ -342,7 +393,22 @@ export async function updateTask(prisma, id, taskData) {
 			? (updateData.completionDate || existingTask.completionDate)
 			: existingTask.completionDate;
 
-		if (execDate && compDate) {
+		// Special condition: if task is being marked as completed with completionDate, calculate duration
+		if (updateData.taskStatus === 'completed' && updateData.completionDate) {
+			// Use executionDate from update or existing task
+			const executionDate = updateData.executionDate !== undefined
+				? (updateData.executionDate || existingTask.executionDate)
+				: existingTask.executionDate;
+			
+			if (executionDate) {
+				// Calculate duration in minutes from execution to completion
+				updateData.totalDuration = calculateDuration(
+					new Date(executionDate),
+					new Date(updateData.completionDate)
+				);
+			}
+		} else if (execDate && compDate) {
+			// General case: if both execution and completion dates are set, calculate duration
 			updateData.totalDuration = calculateDuration(
 				new Date(execDate),
 				new Date(compDate)
@@ -382,11 +448,22 @@ export async function updateTask(prisma, id, taskData) {
 			}
 		}
 
-		const taskModel = prisma[_taskModelKey] || prisma.taskModel;
-		if (!taskModel) {
-			return { success: false, error: 'TaskModel not available', statusCode: 500 };
+		// Verify parent task exists if parentTaskId is being updated
+		if (updateData.parentTaskId !== undefined && updateData.parentTaskId) {
+			const parentTask = await prisma.task.findUnique({
+				where: { id: updateData.parentTaskId },
+			});
+
+			if (!parentTask) {
+				return { 
+					success: false, 
+					error: 'Parent task not found',
+					statusCode: 404 
+				};
+			}
 		}
-		const task = await taskModel.update({
+
+		const task = await prisma.task.update({
 			where: { id: taskId },
 			data: updateData,
 		});
@@ -414,10 +491,6 @@ export async function updateTask(prisma, id, taskData) {
  * @returns {Promise<Object>} Success status
  */
 export async function deleteTask(prisma, id) {
-	if (!prisma) {
-		return { success: false, error: 'Prisma client is not initialized', statusCode: 500 };
-	}
-	
 	try {
 		const taskId = parseInt(id);
 		if (isNaN(taskId)) {
@@ -425,7 +498,7 @@ export async function deleteTask(prisma, id) {
 		}
 
 		// Check if task exists
-		const existingTask = await prisma.taskModel.findUnique({
+		const existingTask = await prisma.task.findUnique({
 			where: { id: taskId },
 		});
 
@@ -433,11 +506,7 @@ export async function deleteTask(prisma, id) {
 			return { success: false, error: 'Task not found', statusCode: 404 };
 		}
 
-		const taskModel = prisma[_taskModelKey] || prisma.taskModel;
-		if (!taskModel) {
-			return { success: false, error: 'TaskModel not available', statusCode: 500 };
-		}
-		await taskModel.delete({
+		await prisma.task.delete({
 			where: { id: taskId },
 		});
 

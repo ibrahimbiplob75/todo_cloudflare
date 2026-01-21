@@ -56,6 +56,26 @@
       </button>
 
       <button
+        v-if="hasSubtasks"
+        @click.stop="viewSubtasks"
+        class="px-3 py-1 bg-purple-50 text-purple-600 rounded text-sm hover:bg-purple-100 transition-colors"
+        :title="`${task.totalSubTasks || 0} subtasks`"
+      >
+        <i class="fas fa-sitemap mr-1"></i>
+        Sub Tasks ({{ task.totalSubTasks || 0 }})
+      </button>
+      
+      <button
+        v-else
+        @click.stop="createSubtask"
+        class="px-3 py-1 bg-purple-50 text-purple-600 rounded text-sm hover:bg-purple-100 transition-colors"
+        title="Create sub task"
+      >
+        <i class="fas fa-plus mr-1"></i>
+        Create Sub Task
+      </button>
+
+      <button
         @click.stop="editTask"
         class="px-3 py-1 bg-gray-50 text-gray-600 rounded text-sm hover:bg-gray-100 transition-colors"
       >
@@ -109,6 +129,9 @@ export default {
         hold: 'bg-yellow-100 text-yellow-700',
       }
     },
+    hasSubtasks() {
+      return (this.task.totalSubTasks || 0) > 0
+    },
   },
   methods: {
     viewTask() {
@@ -116,6 +139,12 @@ export default {
     },
     editTask() {
       this.$router.push({ name: 'task-edit', params: { id: this.task.id } })
+    },
+    viewSubtasks() {
+      this.$router.push({ name: 'task-subtasks', params: { id: this.task.id } })
+    },
+    createSubtask() {
+      this.$router.push({ name: 'task-subtasks-create', params: { id: this.task.id } })
     },
     startTask() {
       this.$emit('start', this.task.id)
