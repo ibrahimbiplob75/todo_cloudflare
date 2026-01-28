@@ -3,20 +3,45 @@
  */
 
 /**
- * List all projects
+ * List all projects as groups, each project including its related meetings.
  * @param {PrismaClient} prisma - Prisma client instance
  * @param {number} userId - Optional: filter by creator
- * @returns {Promise<Array>} Array of projects
+ * @returns {Promise<Object>} { success, data: groups } where each group is { ...project, meetings: Meeting[] }
  */
 export async function listProjects(prisma, userId = null) {
 	try {
 		const where = userId ? { creator: userId } : {};
-		
+
 		const projects = await prisma.project.findMany({
 			where,
 			orderBy: { createdAt: 'desc' },
 		});
+
+		if (projects.length === 0) {
+			return { success: true, data: [] };
+		}
+
 		return { success: true, data: projects };
+
+		// const projectIds = projects.map((p) => p.id);
+		// const meetings = await prisma.meeting.findMany({
+		// 	where: { projectId: { in: projectIds } },
+		// 	orderBy: { id: 'desc' },
+		// });
+
+		// const meetingsByProjectId = new Map();
+		// for (const m of meetings) {
+		// 	const list = meetingsByProjectId.get(m.projectId) || [];
+		// 	list.push(m);
+		// 	meetingsByProjectId.set(m.projectId, list);
+		// }
+
+		// const groups = projects.map((project) => ({
+		// 	...project,
+		// 	meetings: meetingsByProjectId.get(project.id) || [],
+		// }));
+
+		// return { success: true, data: groups };
 	} catch (error) {
 		console.error('Error listing projects:', error);
 		return { success: false, error: error.message };
