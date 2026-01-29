@@ -47,6 +47,7 @@ model Task {
   totalDuration  Int?      @default(0) @map("total_duration") // Duration in minutes
   assignedTo     Int?      @map("assigned_to")
   comment        String?
+  status         Int       @default(1) @map("status") // 1: active, 0: inactive
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
 

@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS "tasks" (
     "total_duration" INTEGER DEFAULT 0,
     "assigned_to" INTEGER,
     "comment" TEXT,
+    "status" TINYINT NOT NULL DEFAULT 1, -- 1: active, 0: inactive
     "created_at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
