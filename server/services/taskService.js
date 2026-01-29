@@ -24,14 +24,19 @@ function calculateDuration(startDate, endDate) {
  */
 export async function listTasks(prisma, filters = {}) {
 	try {
-		const where = {};
+		const where = { status: 1 };
 
 		if (filters.parentTaskId === undefined) {
 			where.parentTaskId = null;
 		} else if (filters.parentTaskId !== null) {
 			where.parentTaskId = parseInt(filters.parentTaskId);
 		}
-		if (filters.projectId !== undefined) where.projectId = filters.projectId;
+		const projectId = filters.projectId;
+		if (projectId !== undefined) where.projectId = projectId;
+		if (filters.projectMeetingId != null && filters.projectMeetingId !== '') {
+			const mid = parseInt(filters.projectMeetingId, 10);
+			if (!isNaN(mid)) where.projectMeetingId = mid;
+		}
 		if (filters.assignedTo !== undefined) where.assignedTo = filters.assignedTo;
 		if (filters.taskStatus !== undefined) where.taskStatus = filters.taskStatus;
 		if (filters.priority !== undefined) where.priority = filters.priority;
@@ -44,6 +49,16 @@ export async function listTasks(prisma, filters = {}) {
 			const toEnd = new Date(filters.to_date);
 			toEnd.setHours(23, 59, 59, 999);
 			where.completionDate = { gte: fromStart, lte: toEnd };
+		}
+
+		const hasSubmissionDateRange = filters.submission_date_from != null && filters.submission_date_to != null &&
+			String(filters.submission_date_from).trim() !== '' && String(filters.submission_date_to).trim() !== '';
+		if (hasSubmissionDateRange) {
+			const subFrom = new Date(filters.submission_date_from);
+			subFrom.setHours(0, 0, 0, 0);
+			const subTo = new Date(filters.submission_date_to);
+			subTo.setHours(23, 59, 59, 999);
+			where.submissionDate = { gte: subFrom, lte: subTo };
 		}
 
 		const orderBy = hasDateRange ? { submissionDate: 'asc' } : { createdAt: 'desc' };
@@ -631,9 +646,15 @@ export async function deleteTask(prisma, id) {
 			return { success: false, error: 'Task not found', statusCode: 404 };
 		}
 
-		await prisma.task.delete({
+		// Soft delete: set status = 0 (inactive)
+		await prisma.task.update({
 			where: { id: taskId },
+			data: { status: 0 },
 		});
+
+		// await prisma.task.delete({
+		// 	where: { id: taskId },
+		// });
 
 		return { success: true, message: 'Task deleted successfully' };
 	} catch (error) {
