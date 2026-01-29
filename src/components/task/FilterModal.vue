@@ -49,12 +49,49 @@
           <select
             v-model="localFilters.projectId"
             class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+            @change="onProjectChange"
           >
             <option :value="null">All Projects</option>
             <option v-for="project in projects" :key="project.id" :value="project.id">
               {{ project.title }}
             </option>
           </select>
+        </div>
+
+        <div v-if="localFilters.projectId">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Meeting</label>
+          <select
+            v-model="localFilters.projectMeetingId"
+            :disabled="loadingMeetings"
+            class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none disabled:bg-gray-100 disabled:cursor-wait"
+          >
+            <option :value="null">{{ loadingMeetings ? 'Loading...' : 'All Meetings' }}</option>
+            <option v-for="meeting in projectMeetings" :key="meeting.id" :value="meeting.id">
+              {{ meeting.title }}
+            </option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Submission date range</label>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">From</label>
+              <input
+                v-model="localFilters.submission_date_from"
+                type="date"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+              />
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">To</label>
+              <input
+                v-model="localFilters.submission_date_to"
+                type="date"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+              />
+            </div>
+          </div>
         </div>
 
         <div class="flex gap-3 pt-4 border-t">
@@ -78,6 +115,7 @@
 
 <script>
 import { useProjectStore } from '@stores/project'
+import { useMeetingStore } from '@stores/meeting'
 
 export default {
   name: 'FilterModal',
@@ -94,10 +132,15 @@ export default {
   emits: ['close', 'apply'],
   data() {
     return {
+      loadingMeetings: false,
+      projectMeetings: [],
       localFilters: {
         taskStatus: null,
         priority: null,
         projectId: null,
+        projectMeetingId: null,
+        submission_date_from: null,
+        submission_date_to: null,
       },
       statusOptions: [
         { value: 'pending', label: 'Pending' },
@@ -118,6 +161,9 @@ export default {
     projectStore() {
       return useProjectStore()
     },
+    meetingStore() {
+      return useMeetingStore()
+    },
     projects() {
       return this.projectStore.projects || []
     },
@@ -132,7 +178,11 @@ export default {
     isOpen(newVal) {
       if (newVal) {
         this.localFilters = { ...this.filters }
+        this.fetchMeetingsForProject()
       }
+    },
+    'localFilters.projectId'(projectId) {
+      this.fetchMeetingsForProject()
     },
   },
   async mounted() {
@@ -141,6 +191,27 @@ export default {
     }
   },
   methods: {
+    async onProjectChange() {
+      this.localFilters.projectMeetingId = null
+      await this.fetchMeetingsForProject()
+    },
+    async fetchMeetingsForProject() {
+      const projectId = this.localFilters.projectId
+      if (!projectId) {
+        this.projectMeetings = []
+        return
+      }
+      this.loadingMeetings = true
+      try {
+        this.meetingStore.setFilters({ projectId })
+        const result = await this.meetingStore.fetchMeetings(true)
+        this.projectMeetings = result.success ? (result.data || []).sort((a, b) => b.id - a.id) : []
+      } catch {
+        this.projectMeetings = []
+      } finally {
+        this.loadingMeetings = false
+      }
+    },
     close() {
       this.$emit('close')
     },
@@ -153,7 +224,11 @@ export default {
         taskStatus: null,
         priority: null,
         projectId: null,
+        projectMeetingId: null,
+        submission_date_from: null,
+        submission_date_to: null,
       }
+      this.projectMeetings = []
       this.$emit('apply', { ...this.localFilters })
       this.close()
     },

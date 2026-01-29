@@ -24,7 +24,7 @@
     </div>
 
     <!-- Task List Section -->
-    <div class="flex-1 overflow-y-auto px-3 py-2">
+    <div class="flex-1 overflow-y-auto px-0 lg:px-3 py-2">
       <!-- Loading State -->
       <div v-if="loading && tasks.length === 0" class="text-center py-12">
         <p class="text-gray-500">Loading tasks...</p>
@@ -186,9 +186,11 @@ export default {
     activeFilterCount() {
       let count = 0
       if (this.filters.projectId) count++
+      if (this.filters.projectMeetingId) count++
       if (this.filters.taskStatus) count++
       if (this.filters.priority) count++
       if (this.filters.assignedTo) count++
+      if (this.filters.submission_date_from && this.filters.submission_date_to) count++
       return count
     },
   },
@@ -266,8 +268,13 @@ export default {
         alert(result.error || 'Failed to update task')
       }
     },
-    handleSoftDelete(taskId) {
-      this.taskStore.softDeleteTask(taskId)
+    async handleSoftDelete(taskId) {
+      const result = await this.taskStore.deleteTask(taskId)
+      if (result.success) {
+        await this.fetchTasks(true)
+      } else {
+        alert(result.error || 'Failed to delete task')
+      }
     },
     handleApplyFilters(newFilters) {
       this.taskStore.setFilters(newFilters)

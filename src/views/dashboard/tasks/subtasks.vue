@@ -158,8 +158,13 @@ export default {
         alert(result.error || 'Failed to update task')
       }
     },
-    handleSoftDelete(taskId) {
-      this.taskStore.softDeleteTask(taskId)
+    async handleSoftDelete(taskId) {
+      const result = await this.taskStore.deleteTask(taskId)
+      if (result.success) {
+        await this.fetchSubtasks()
+      } else {
+        alert(result.error || 'Failed to delete task')
+      }
     },
   },
 }
