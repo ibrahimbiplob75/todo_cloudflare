@@ -47,6 +47,9 @@ export const useTaskStore = defineStore('task', {
       assignedTo: null,
       taskStatus: null,
       priority: null,
+      projectMeetingId: null,
+      submission_date_from: null,
+      submission_date_to: null,
     },
     
     // Soft delete tracking (frontend only)
@@ -103,6 +106,9 @@ export const useTaskStore = defineStore('task', {
         if (this.filters.assignedTo) params.append('assigned_to', this.filters.assignedTo)
         if (this.filters.taskStatus) params.append('task_status', this.filters.taskStatus)
         if (this.filters.priority) params.append('priority', this.filters.priority)
+        if (this.filters.projectMeetingId) params.append('project_meeting_id', this.filters.projectMeetingId)
+        if (this.filters.submission_date_from) params.append('submission_date_from', this.filters.submission_date_from)
+        if (this.filters.submission_date_to) params.append('submission_date_to', this.filters.submission_date_to)
 
         const res = await api.get(`/task?${params.toString()}`)
         const data = res.data.data || []
@@ -245,16 +251,28 @@ export const useTaskStore = defineStore('task', {
     },
 
     /**
-     * Soft delete task (hide from UI)
+     * Delete task via API (soft delete: status = 0)
+     */
+    async deleteTask(id) {
+      const taskId = parseInt(id)
+      if (isNaN(taskId)) return { success: false, error: 'Invalid task ID' }
+      try {
+        await api.post(`/task/${taskId}/delete`)
+        return { success: true }
+      } catch (error) {
+        const err = error.response?.data?.error || error.message || 'Failed to delete task'
+        return { success: false, error: err }
+      }
+    },
+
+    /**
+     * Soft delete task (hide from UI, no API)
      */
     softDeleteTask(id) {
       const taskId = parseInt(id)
       this.deletedTaskIds.add(taskId)
-      
-      // Remove from visible tasks list
       this.tasks = this.tasks.filter((task) => task.id !== taskId)
       this.totalTasks--
-      
       if (this.currentTask?.id === taskId) {
         this.currentTask = null
       }
@@ -286,6 +304,9 @@ export const useTaskStore = defineStore('task', {
         assignedTo: null,
         taskStatus: null,
         priority: null,
+        projectMeetingId: null,
+        submission_date_from: null,
+        submission_date_to: null,
       }
       this.currentPage = 1
     },
