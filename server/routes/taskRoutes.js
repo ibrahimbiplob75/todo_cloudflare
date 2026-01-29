@@ -31,6 +31,9 @@ export async function handleTaskRoutes(request, prisma, corsHeaders, env = {}) {
 			if (searchParams.has('project_id')) {
 				filters.projectId = parseInt(searchParams.get('project_id'));
 			}
+			if (searchParams.has('project_meeting_id')) {
+				filters.projectMeetingId = parseInt(searchParams.get('project_meeting_id'));
+			}
 			
 			if (searchParams.has('assigned_to')) {
 				filters.assignedTo = parseInt(searchParams.get('assigned_to'));
@@ -54,6 +57,8 @@ export async function handleTaskRoutes(request, prisma, corsHeaders, env = {}) {
 
 			if (searchParams.has('from_date')) filters.from_date = searchParams.get('from_date');
 			if (searchParams.has('to_date')) filters.to_date = searchParams.get('to_date');
+			if (searchParams.has('submission_date_from')) filters.submission_date_from = searchParams.get('submission_date_from');
+			if (searchParams.has('submission_date_to')) filters.submission_date_to = searchParams.get('submission_date_to');
 			if (searchParams.has('show_all')) {
 				const v = searchParams.get('show_all');
 				filters.show_all = v === '1' || v === 'true';
