@@ -1,5 +1,5 @@
 <template>
-  <div class="h-[73px] border-t border-gray-200 flex items-center gap-2 px-3 bg-white">
+  <div class="h-[73px] border-t border-gray-200 flex flex-wrap items-center gap-2 px-3 py-1 bg-white">
     <select
       v-model="selectedProjectId"
       @change="handleProjectChange"
