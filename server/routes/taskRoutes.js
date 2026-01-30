@@ -19,6 +19,52 @@ export async function handleTaskRoutes(request, prisma, corsHeaders, env = {}) {
 		return payload?.userId || null;
 	}
 
+	// GET /task/stats - Task progress (total, incomplete)
+	if (pathname === "/task/stats" && method === 'GET') {
+		try {
+			const userId = await getUserId();
+			const result = await taskService.getTaskProgressStats(prisma, userId);
+
+			if (result.success) {
+				return Response.json(result.data, { headers: corsHeaders });
+			}
+
+			return Response.json(
+				{ error: result.error },
+				{ status: result.statusCode || 500, headers: corsHeaders }
+			);
+		} catch (error) {
+			console.error('Task stats error:', error);
+			return Response.json(
+				{ error: 'Failed to fetch task stats' },
+				{ status: 500, headers: corsHeaders }
+			);
+		}
+	}
+
+	// GET /task/analytics - Task counts by status
+	if (pathname === "/task/analytics" && method === 'GET') {
+		try {
+			const userId = await getUserId();
+			const result = await taskService.getTaskStatusAnalytics(prisma, userId);
+
+			if (result.success) {
+				return Response.json({ statuses: result.data }, { headers: corsHeaders });
+			}
+
+			return Response.json(
+				{ error: result.error },
+				{ status: result.statusCode || 500, headers: corsHeaders }
+			);
+		} catch (error) {
+			console.error('Task analytics error:', error);
+			return Response.json(
+				{ error: 'Failed to fetch task analytics' },
+				{ status: 500, headers: corsHeaders }
+			);
+		}
+	}
+
 	// GET /task - List all tasks (with optional filters)
 	if (pathname === "/task" && method === 'GET') {
 		try {

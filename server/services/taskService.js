@@ -15,6 +15,79 @@ function calculateDuration(startDate, endDate) {
 }
 
 /**
+ * Get task progress stats: total and incomplete counts for active tasks.
+ * @param {PrismaClient} prisma - Prisma client instance
+ * @param {number} userId - Filter by assigned user
+ * @returns {Promise<Object>} { success, data: { total, incomplete } }
+ */
+export async function getTaskProgressStats(prisma, userId = null) {
+	try {
+		const where = { status: 1, parentTaskId: null };
+		if (userId) where.assignedTo = userId;
+
+		const tasks = await prisma.task.findMany({
+			where,
+			select: { taskStatus: true },
+		});
+
+		const total = tasks.length;
+		const incomplete = tasks.filter((t) => t.taskStatus !== 'completed').length;
+
+		return { success: true, data: { total, incomplete } };
+	} catch (error) {
+		console.error('Error getting task progress stats:', error);
+		return { success: false, error: error.message };
+	}
+}
+
+/**
+ * Get task status analytics: count of tasks per status (pending, in_progress, completed, failed, hold).
+ * Only counts active tasks (status=1).
+ * @param {PrismaClient} prisma - Prisma client instance
+ * @param {number} userId - Filter by assigned user
+ * @returns {Promise<Object>} { success, data: [{ status, label, count }] }
+ */
+export async function getTaskStatusAnalytics(prisma, userId = null) {
+	try {
+		const where = { status: 1, parentTaskId: null };
+		if (userId) where.assignedTo = userId;
+
+		const statuses = ['pending', 'in_progress', 'completed', 'failed', 'hold'];
+		const labels = {
+			pending: 'Pending',
+			in_progress: 'In Progress',
+			completed: 'Completed',
+			failed: 'Failed',
+			hold: 'Hold',
+		};
+
+		const tasks = await prisma.task.findMany({
+			where,
+			select: { taskStatus: true },
+		});
+
+		const countByStatus = new Map();
+		for (const s of statuses) countByStatus.set(s, 0);
+		for (const t of tasks) {
+			if (statuses.includes(t.taskStatus)) {
+				countByStatus.set(t.taskStatus, (countByStatus.get(t.taskStatus) || 0) + 1);
+			}
+		}
+
+		const data = statuses.map((status) => ({
+			status,
+			label: labels[status],
+			count: countByStatus.get(status) || 0,
+		}));
+
+		return { success: true, data };
+	} catch (error) {
+		console.error('Error getting task status analytics:', error);
+		return { success: false, error: error.message };
+	}
+}
+
+/**
  * List tasks with optional filters, pagination, and show_all.
  * When show_all is true, returns all matching tasks; otherwise 20 per page.
  *
