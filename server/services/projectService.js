@@ -21,7 +21,30 @@ export async function listProjects(prisma, userId = null) {
 			return { success: true, data: [] };
 		}
 
-		return { success: true, data: projects };
+		const projectIds = projects.map((p) => p.id);
+		const [meetingCounts, taskCounts] = await Promise.all([
+			prisma.meeting.groupBy({
+				by: ['projectId'],
+				where: { projectId: { in: projectIds } },
+				_count: { id: true },
+			}),
+			prisma.task.groupBy({
+				by: ['projectId'],
+				where: { projectId: { in: projectIds }, status: 1 },
+				_count: { id: true },
+			}),
+		]);
+
+		const meetingsByProject = new Map(meetingCounts.map((m) => [m.projectId, m._count.id]));
+		const tasksByProject = new Map(taskCounts.map((t) => [t.projectId, t._count.id]));
+
+		const data = projects.map((p) => ({
+			...p,
+			total_meetings: meetingsByProject.get(p.id) ?? 0,
+			total_tasks: tasksByProject.get(p.id) ?? 0,
+		}));
+
+		return { success: true, data };
 
 		// const projectIds = projects.map((p) => p.id);
 		// const meetings = await prisma.meeting.findMany({
