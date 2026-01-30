@@ -185,11 +185,15 @@ export default {
     },
     async fetchMonthData() {
       const cacheKey = `task_calendar_${this.selectedYear}_${this.selectedMonth}`
+      const CACHE_TTL_MS = 60_000 // 1 minute
       const cached = localStorage.getItem(cacheKey)
       if (cached) {
         try {
-          this.countsByDay = JSON.parse(cached) || {}
-          return
+          const { data, ts } = JSON.parse(cached) || {}
+          if (data && ts && Date.now() - ts < CACHE_TTL_MS) {
+            this.countsByDay = data
+            return
+          }
         } catch (_) {}
       }
       this.loading = true
@@ -199,7 +203,7 @@ export default {
           params: { year: this.selectedYear, month: this.selectedMonth },
         })
         this.countsByDay = res.data || {}
-        localStorage.setItem(cacheKey, JSON.stringify(this.countsByDay))
+        localStorage.setItem(cacheKey, JSON.stringify({ data: this.countsByDay, ts: Date.now() }))
       } catch (err) {
         this.error = err.response?.data?.error || err.message || 'Failed to load'
         this.countsByDay = {}

@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="overflow-y-auto h-full">
     <h1 class="text-3xl font-bold text-gray-800 mb-6">Dashboard</h1>
     
     <div class="bg-white rounded-lg shadow-md p-6">
