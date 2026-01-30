@@ -36,6 +36,14 @@
         @click="viewProject(project.id)"
       >
         <h3 class="text-xl font-semibold text-gray-800 mb-2">{{ project.title }}</h3>
+        <div>
+          <div>
+            <i class="fas fa-calendar-alt mr-1"></i> total meetings: {{ project.total_meetings }}
+          </div>
+          <div>
+            <i class="fas fa-tasks mr-1"></i> total tasks: {{ project.total_tasks }}
+          </div>
+        </div>
         <p v-if="project.description" class="text-gray-600 text-sm mb-4 line-clamp-2">
           {{ project.description }}
         </p>
@@ -47,6 +55,14 @@
             {{ formatDate(project.createdAt) }}
           </span>
           <div class="flex gap-2">
+            <router-link
+              :to="{ name: 'project-details', params: { id: project.id } }"
+              @click.stop
+              class="px-3 py-1 bg-gray-50 text-gray-600 rounded hover:bg-gray-100 transition-colors"
+              title="Project Details"
+            >
+              <i class="fas fa-print"></i>
+            </router-link>
             <button
               @click.stop="editProject(project.id)"
               class="px-3 py-1 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors"

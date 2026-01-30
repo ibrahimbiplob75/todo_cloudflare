@@ -1,4 +1,5 @@
 import * as projectService from '../services/projectService.js';
+import * as taskService from '../services/taskService.js';
 import { extractTokenFromRequest, verifyToken } from '../services/authService.js';
 
 /**
@@ -98,6 +99,43 @@ export async function handleProjectRoutes(request, prisma, corsHeaders, env = {}
 			return Response.json(
 				{ error: 'Invalid request body' },
 				{ status: 400, headers: corsHeaders }
+			);
+		}
+	}
+
+	// GET /project/{id}/tasks - Get project tasks for details page
+	const projectTasksMatch = pathname.match(/^\/project\/(\d+)\/tasks$/);
+	if (projectTasksMatch && method === 'GET') {
+		try {
+			const projectId = projectTasksMatch[1];
+			const params = url.searchParams;
+			const taskStatusParam = params.get('task_status');
+			const taskStatus = taskStatusParam
+				? taskStatusParam.split(',').map((s) => s.trim()).filter(Boolean)
+				: [];
+			const projectMeetingId = params.get('project_meeting_id');
+			const filters = {
+				task_status: taskStatus.length > 0 ? taskStatus : undefined,
+				project_meeting_id: projectMeetingId || null,
+				date_type: params.get('date_type') || 'submission_date',
+				sort_by: params.get('sort_by') || 'date_type',
+				sort_order: params.get('sort_order') || 'asc',
+				from_date: params.get('from_date') || null,
+				to_date: params.get('to_date') || null,
+			};
+			const result = await taskService.getProjectTasks(prisma, projectId, filters);
+			if (result.success) {
+				return Response.json({ tasks: result.data }, { headers: corsHeaders });
+			}
+			return Response.json(
+				{ error: result.error },
+				{ status: result.statusCode || 500, headers: corsHeaders }
+			);
+		} catch (error) {
+			console.error('Project tasks error:', error);
+			return Response.json(
+				{ error: 'Failed to fetch project tasks' },
+				{ status: 500, headers: corsHeaders }
 			);
 		}
 	}

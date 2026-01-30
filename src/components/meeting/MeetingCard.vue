@@ -19,6 +19,21 @@
       </div>
     </div>
 
+    <div class="flex flex-wrap gap-2 mb-3">
+      <span v-if="meeting.total_tasks > 0" class="px-3 py-1 bg-blue-50 text-blue-600 rounded text-sm hover:bg-blue-100 transition-colors">
+        <i class="fas fa-tasks"></i>
+        {{ meeting.total_tasks }} tasks
+      </span>
+      <span v-if="meeting.total_completed > 0" class="px-3 py-1 bg-green-50 text-green-600 rounded text-sm hover:bg-green-100 transition-colors">
+        <i class="fas fa-check"></i>
+        {{ meeting.total_completed }} completed
+      </span>
+      <span v-if="meeting.total_incompleted > 0" class="px-3 py-1 bg-red-50 text-red-600 rounded text-sm hover:bg-red-100 transition-colors">
+        <i class="fas fa-times"></i>
+        {{ meeting.total_incompleted }} incompleted
+      </span>
+    </div>
+
     <p v-if="meeting.description" class="text-sm text-gray-600 mb-3 line-clamp-2">
       {{ meeting.description }}
     </p>
@@ -30,6 +45,15 @@
       </span>
       
       <div class="flex gap-2">
+        <router-link
+          v-if="meeting.projectId"
+          :to="{ name: 'meeting-details', params: { projectId: meeting.projectId, meetingId: meeting.id } }"
+          @click.stop
+          class="px-3 py-1 bg-blue-50 text-blue-600 rounded text-sm hover:bg-blue-100 transition-colors"
+          title="Meeting task details"
+        >
+          <i class="fas fa-tasks"></i>
+        </router-link>
         <button
           @click.stop="editMeeting"
           class="px-3 py-1 bg-gray-50 text-gray-600 rounded text-sm hover:bg-gray-100 transition-colors"
@@ -37,7 +61,6 @@
         >
           <i class="fas fa-edit"></i>
         </button>
-        
         <button
           @click.stop="deleteMeeting"
           class="px-3 py-1 bg-red-50 text-red-600 rounded text-sm hover:bg-red-100 transition-colors"

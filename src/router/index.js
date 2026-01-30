@@ -53,6 +53,18 @@ const router = createRouter({
       meta: { middleware: 'private', layout: 'private' },
     },
     {
+      path: '/project-details/:id',
+      name: 'project-details',
+      component: () => import('@views/dashboard/projects/details.vue'),
+      meta: { middleware: 'private', layout: 'private' },
+    },
+    {
+      path: '/meeting-details/:projectId/:meetingId',
+      name: 'meeting-details',
+      component: () => import('@views/dashboard/projects/details.vue'),
+      meta: { middleware: 'private', layout: 'private' },
+    },
+    {
       path: '/tasks',
       name: 'tasks-list',
       component: () => import('@views/dashboard/tasks/list.vue'),

@@ -350,6 +350,93 @@ export async function listTasks(prisma, filters = {}) {
 }
 
 /**
+ * Get project tasks for the project details page.
+ * Returns tasks with subtasks, grouped by date (submission or completion) and meeting.
+ * @param {PrismaClient} prisma - Prisma client instance
+ * @param {number} projectId - Project ID
+ * @param {Object} filters - task_status (array), date_type, sort_by, sort_order, from_date, to_date
+ * @returns {Promise<Object>} { success, data: tasks }
+ */
+export async function getProjectTasks(prisma, projectId, filters = {}) {
+	try {
+		const pid = parseInt(projectId, 10);
+		if (isNaN(pid)) {
+			return { success: false, error: 'Invalid project ID' };
+		}
+
+		const where = { status: 1, projectId: pid, parentTaskId: null };
+
+		if (filters.task_status && Array.isArray(filters.task_status) && filters.task_status.length > 0) {
+			where.taskStatus = { in: filters.task_status };
+		}
+
+		if (filters.project_meeting_id != null && filters.project_meeting_id !== '') {
+			const mid = parseInt(filters.project_meeting_id, 10);
+			if (!isNaN(mid)) where.projectMeetingId = mid;
+		}
+
+		const dateType = filters.date_type === 'completion_date' ? 'completionDate' : 'submissionDate';
+		const dateField = dateType;
+
+		const hasDateRange =
+			filters.from_date != null &&
+			filters.to_date != null &&
+			String(filters.from_date).trim() !== '' &&
+			String(filters.to_date).trim() !== '';
+
+		if (hasDateRange) {
+			const fromStart = new Date(filters.from_date);
+			fromStart.setHours(0, 0, 0, 0);
+			const toEnd = new Date(filters.to_date);
+			toEnd.setHours(23, 59, 59, 999);
+			where[dateField] = { gte: fromStart, lte: toEnd };
+		} else {
+			where[dateField] = { not: null };
+		}
+
+		const sortBy = filters.sort_by === 'id' ? 'id' : dateField;
+		const sortOrder = filters.sort_order === 'desc' ? 'desc' : 'asc';
+
+		const tasks = await prisma.task.findMany({
+			where,
+			orderBy: { [sortBy]: sortOrder },
+			include: {
+				subtasks: {
+					orderBy: { id: 'asc' },
+					select: {
+						id: true,
+						title: true,
+						description: true,
+						comment: true,
+						taskStatus: true,
+					},
+				},
+			},
+		});
+
+		const meetingIds = [...new Set(tasks.map((t) => t.projectMeetingId).filter(Boolean))];
+		const meetings =
+			meetingIds.length > 0
+				? await prisma.meeting.findMany({
+						where: { id: { in: meetingIds } },
+						select: { id: true, title: true },
+					})
+				: [];
+		const meetingById = new Map(meetings.map((m) => [m.id, m.title]));
+
+		const data = tasks.map((task) => ({
+			...task,
+			meetingName: task.projectMeetingId ? meetingById.get(task.projectMeetingId) ?? null : null,
+		}));
+
+		return { success: true, data };
+	} catch (error) {
+		console.error('Error getting project tasks:', error);
+		return { success: false, error: error.message };
+	}
+}
+
+/**
  * Get a single task by ID
  * @param {PrismaClient} prisma - Prisma client instance
  * @param {number} id - Task ID
