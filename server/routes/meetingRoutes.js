@@ -54,11 +54,12 @@ export async function handleMeetingRoutes(request, prisma, corsHeaders, env = {}
 			if (searchParams.has('project_id')) {
 				filters.projectId = parseInt(searchParams.get('project_id'));
 			}
-			
+
 			if (searchParams.has('creator')) {
 				filters.creator = parseInt(searchParams.get('creator'));
-			} else if (userId) {
-				// If authenticated, default to user's meetings if no filter specified
+			} else if (userId && !filters.projectId) {
+				// When project_id is specified, return all meetings for the project.
+				// Otherwise default to user's meetings.
 				filters.creator = userId;
 			}
 			
