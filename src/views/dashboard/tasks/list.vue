@@ -198,11 +198,38 @@ export default {
     showTaskFormModal(isOpen) {
       if (isOpen) this.createError = ''
     },
-  },
-  async mounted() {
-    await this.fetchTasks()
+    '$route.query': {
+      handler(query) {
+        this.applyProjectFromQuery(query)
+        this.fetchTasks(true)
+      },
+      immediate: true,
+    },
   },
   methods: {
+    applyProjectFromQuery(query) {
+      const projectId = query?.project_id
+      const projectMeetingId = query?.project_meeting_id
+      const taskStatus = query?.task_status
+      const filters = {
+        projectId: null,
+        projectMeetingId: null,
+        taskStatus: null,
+      }
+      if (projectId != null && projectId !== '') {
+        const id = parseInt(projectId, 10)
+        if (!isNaN(id)) filters.projectId = id
+      }
+      if (projectMeetingId != null && projectMeetingId !== '') {
+        const mid = parseInt(projectMeetingId, 10)
+        if (!isNaN(mid)) filters.projectMeetingId = mid
+      }
+      const validStatuses = ['pending', 'in_progress', 'completed', 'failed', 'hold']
+      if (taskStatus && validStatuses.includes(taskStatus)) {
+        filters.taskStatus = taskStatus
+      }
+      this.taskStore.setFilters(filters)
+    },
     async fetchTasks(forceRefresh = false, page = undefined) {
       await this.taskStore.fetchTasks(forceRefresh, page ?? this.taskStore.currentPage)
     },
