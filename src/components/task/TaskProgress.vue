@@ -28,13 +28,13 @@
         </svg>
         <div class="circle_label">
           <span class="percent">{{ incompletePercent }}%</span>
-          <span class="of_total">of total</span>
+          <span class="of_total">incomplete</span>
         </div>
       </div>
       <div class="counts text-gray-700">
-        <span class="text-2xl font-bold">{{ incomplete }}/{{ total }}</span>
+        <span class="text-2xl font-bold">{{ completed }}/{{ total }}</span>
         <span class="text-sm text-gray-500 ml-1">
-          remaining ({{ total - incomplete }})
+          remaining ({{ total - completed }})
         </span>
       </div>
     </template>
@@ -109,6 +109,7 @@ export default {
     return {
       total: 0,
       incomplete: 0,
+      completed: 0,
       todayCompleted: 0,
       thisWeekCompleted: 0,
       thisMonthCompleted: 0,
@@ -158,6 +159,7 @@ export default {
         const res = await api.get("/task/stats");
         this.total = res.data.total ?? 0;
         this.incomplete = res.data.incomplete ?? 0;
+        this.completed = res.data.completed ?? 0;
         this.todayCompleted = res.data.todayCompleted ?? 0;
         this.thisWeekCompleted = res.data.thisWeekCompleted ?? 0;
         this.thisMonthCompleted = res.data.thisMonthCompleted ?? 0;
