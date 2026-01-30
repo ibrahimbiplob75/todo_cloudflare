@@ -971,3 +971,82 @@ export async function deleteTask(prisma, id) {
 		return { success: false, error: error.message };
 	}
 }
+
+const KANBAN_STATUSES = ['pending', 'in_progress', 'completed', 'failed', 'hold'];
+
+/**
+ * Get tasks for Kanban board, grouped by taskStatus, ordered by serial asc.
+ */
+export async function getKanbanTasks(prisma, filters = {}) {
+	try {
+		const where = { status: 1, parentTaskId: null };
+		if (filters.project_id != null) where.projectId = parseInt(filters.project_id);
+		if (filters.meeting_id != null && filters.meeting_id !== '') {
+			where.projectMeetingId = parseInt(filters.meeting_id);
+		}
+		if (filters.assignedTo != null) where.assignedTo = filters.assignedTo;
+
+		const tasks = await prisma.task.findMany({
+			where,
+			orderBy: [{ taskStatus: 'asc' }, { serial: 'asc' }],
+			select: {
+				id: true,
+				title: true,
+				serial: true,
+				taskStatus: true,
+				priority: true,
+				projectId: true,
+				projectMeetingId: true,
+			},
+		});
+
+		const grouped = {};
+		for (const s of KANBAN_STATUSES) grouped[s] = [];
+		for (const t of tasks) {
+			if (KANBAN_STATUSES.includes(t.taskStatus)) {
+				grouped[t.taskStatus].push(t);
+			}
+		}
+
+		return { success: true, data: grouped };
+	} catch (error) {
+		console.error('Error getting kanban tasks:', error);
+		return { success: false, error: error.message };
+	}
+}
+
+/**
+ * Update task serial and/or taskStatus for Kanban drag-drop.
+ */
+export async function updateKanbanTask(prisma, taskId, payload) {
+	try {
+		const id = parseInt(taskId, 10);
+		if (isNaN(id)) return { success: false, error: 'Invalid task ID' };
+
+		const existing = await prisma.task.findUnique({
+			where: { id },
+			select: { serial: true, taskStatus: true },
+		});
+		if (!existing) return { success: false, error: 'Task not found', statusCode: 404 };
+
+		const data = {};
+		if (payload.serial != null) data.serial = parseInt(payload.serial, 10);
+		if (payload.taskStatus != null && KANBAN_STATUSES.includes(payload.taskStatus)) {
+			data.taskStatus = payload.taskStatus;
+		}
+
+		if (Object.keys(data).length === 0) {
+			return { success: true, data: existing };
+		}
+
+		const updated = await prisma.task.update({
+			where: { id },
+			data: { ...data, updatedAt: new Date() },
+		});
+
+		return { success: true, data: updated };
+	} catch (error) {
+		console.error('Error updating kanban task:', error);
+		return { success: false, error: error.message };
+	}
+}

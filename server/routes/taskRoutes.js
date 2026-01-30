@@ -110,6 +110,71 @@ export async function handleTaskRoutes(request, prisma, corsHeaders, env = {}) {
 		}
 	}
 
+	// GET /kanban-tasks - Tasks grouped by status for Kanban board
+	if (pathname === "/kanban-tasks" && method === 'GET') {
+		try {
+			const userId = await getUserId();
+			const params = url.searchParams;
+			const filters = {
+				project_id: params.get('project_id') || null,
+				meeting_id: params.get('meeting_id') || null,
+				assignedTo: userId,
+			};
+			const result = await taskService.getKanbanTasks(prisma, filters);
+			if (result.success) {
+				return Response.json(result.data, { headers: corsHeaders });
+			}
+			return Response.json(
+				{ error: result.error },
+				{ status: result.statusCode || 500, headers: corsHeaders }
+			);
+		} catch (error) {
+			console.error('Kanban tasks error:', error);
+			return Response.json(
+				{ error: 'Failed to fetch kanban tasks' },
+				{ status: 500, headers: corsHeaders }
+			);
+		}
+	}
+
+	// PATCH /kanban-update-task - Update task serial/taskStatus for Kanban drag-drop
+	if (pathname === "/kanban-update-task" && method === 'PATCH') {
+		try {
+			const userId = await getUserId();
+			if (!userId) {
+				return Response.json(
+					{ error: 'Authentication required' },
+					{ status: 401, headers: corsHeaders }
+				);
+			}
+			const body = await request.json();
+			const { task_id, serial, task_status } = body;
+			if (!task_id) {
+				return Response.json(
+					{ error: 'task_id is required' },
+					{ status: 400, headers: corsHeaders }
+				);
+			}
+			const payload = {};
+			if (serial != null) payload.serial = serial;
+			if (task_status != null) payload.taskStatus = task_status;
+			const result = await taskService.updateKanbanTask(prisma, task_id, payload);
+			if (result.success) {
+				return Response.json(result.data, { headers: corsHeaders });
+			}
+			return Response.json(
+				{ error: result.error },
+				{ status: result.statusCode || 500, headers: corsHeaders }
+			);
+		} catch (error) {
+			console.error('Kanban update error:', error);
+			return Response.json(
+				{ error: 'Failed to update task' },
+				{ status: 500, headers: corsHeaders }
+			);
+		}
+	}
+
 	// GET /task - List all tasks (with optional filters)
 	if (pathname === "/task" && method === 'GET') {
 		try {
