@@ -1,11 +1,20 @@
 <template>
-  <div class="task_item">
-    <div class="icon">
-      <i class="far fa-check-square" aria-hidden="true"></i>
+  <div class="task_block">
+    <div class="task_item">
+      <div class="icon">
+        <i class="far fa-check-square" aria-hidden="true"></i>
+      </div>
+      <div class="task_details">
+        <div class="task_title">{{ task.title }}</div>
+        <div class="task_meta">{{ submissionDateFormatted }}{{ projectPart }}</div>
+      </div>
     </div>
-    <div class="task_details">
-      <div class="task_title">{{ task.title }}</div>
-      <div class="task_meta">{{ submissionDateFormatted }}{{ projectPart }}</div>
+    <div v-if="task.subtasks && task.subtasks.length > 0" class="subtasks_wrapper">
+      <CompletedTask
+        v-for="st in task.subtasks"
+        :key="st.id"
+        :task="st"
+      />
     </div>
   </div>
 </template>
@@ -13,6 +22,9 @@
 <script>
 export default {
   name: 'CompletedTask',
+  components: {
+    CompletedTask: () => import('./CompletedTask.vue'),
+  },
   props: {
     task: {
       type: Object,
@@ -41,6 +53,9 @@ export default {
 </script>
 
 <style scoped>
+.task_block {
+  margin-bottom: 0;
+}
 .task_item {
   display: flex;
   align-items: flex-start;
@@ -48,8 +63,13 @@ export default {
   padding: 0.2rem 0;
   border-bottom: 1px solid #e5e7eb;
 }
-.task_item:last-child {
+.subtasks_wrapper .task_block:last-child .task_item {
   border-bottom: none;
+}
+.subtasks_wrapper {
+  padding-left: 1.5rem;
+  border-left: 1px solid #e5e7eb;
+  margin-left: 0.75rem;
 }
 .icon {
   flex-shrink: 0;
