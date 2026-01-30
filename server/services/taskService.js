@@ -1033,6 +1033,14 @@ export async function updateKanbanTask(prisma, taskId, payload) {
 		if (payload.serial != null) data.serial = parseInt(payload.serial, 10);
 		if (payload.taskStatus != null && KANBAN_STATUSES.includes(payload.taskStatus)) {
 			data.taskStatus = payload.taskStatus;
+			// completion_date: set when completed, clear otherwise
+			data.completionDate = payload.taskStatus === 'completed' ? new Date() : null;
+			// execution_date: set when moving from pending to non-pending, clear when moving to pending
+			if (payload.taskStatus === 'pending') {
+				data.executionDate = null;
+			} else if (existing.taskStatus === 'pending') {
+				data.executionDate = new Date();
+			}
 		}
 
 		if (Object.keys(data).length === 0) {
