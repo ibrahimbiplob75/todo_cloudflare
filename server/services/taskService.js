@@ -90,25 +90,79 @@ export async function getCalendarMonthData(prisma, year, month, userId = null) {
 }
 
 /**
- * Get task progress stats: total and incomplete counts for active tasks.
+ * Get start of ISO week (Monday) for a given date.
+ */
+function getStartOfISOWeek(d) {
+	const date = new Date(d);
+	const day = date.getDay();
+	const diff = date.getDate() - (day === 0 ? 6 : day - 1);
+	date.setDate(diff);
+	date.setHours(0, 0, 0, 0);
+	return date;
+}
+
+/**
+ * Get task progress stats: total, incomplete, and completion counts by period.
  * @param {PrismaClient} prisma - Prisma client instance
  * @param {number} userId - Filter by assigned user
- * @returns {Promise<Object>} { success, data: { total, incomplete } }
+ * @returns {Promise<Object>} { success, data: { total, incomplete, todayCompleted, thisWeekCompleted, thisMonthCompleted } }
  */
 export async function getTaskProgressStats(prisma, userId = null) {
 	try {
-		const where = { status: 1, parentTaskId: null };
-		if (userId) where.assignedTo = userId;
+		const baseWhere = { status: 1, parentTaskId: null, taskStatus: 'completed' };
+		if (userId) baseWhere.assignedTo = userId;
 
-		const tasks = await prisma.task.findMany({
-			where,
-			select: { taskStatus: true },
-		});
+		const now = new Date();
+		const y = now.getFullYear();
+		const m = now.getMonth();
+		const d = now.getDate();
+
+		const startOfToday = new Date(y, m, d);
+		const endOfToday = new Date(y, m, d + 1);
+		const startOfWeek = getStartOfISOWeek(now);
+		const endOfWeek = new Date(startOfWeek);
+		endOfWeek.setDate(startOfWeek.getDate() + 7);
+		const startOfMonth = new Date(y, m, 1);
+		const endOfMonth = new Date(y, m + 1, 1);
+
+		const [tasks, todayCompleted, thisWeekCompleted, thisMonthCompleted] = await Promise.all([
+			prisma.task.findMany({
+				where: { status: 1, parentTaskId: null, ...(userId && { assignedTo: userId }) },
+				select: { taskStatus: true },
+			}),
+			prisma.task.count({
+				where: {
+					...baseWhere,
+					completionDate: { gte: startOfToday, lt: endOfToday },
+				},
+			}),
+			prisma.task.count({
+				where: {
+					...baseWhere,
+					completionDate: { gte: startOfWeek, lt: endOfWeek },
+				},
+			}),
+			prisma.task.count({
+				where: {
+					...baseWhere,
+					completionDate: { gte: startOfMonth, lt: endOfMonth },
+				},
+			}),
+		]);
 
 		const total = tasks.length;
 		const incomplete = tasks.filter((t) => t.taskStatus !== 'completed').length;
 
-		return { success: true, data: { total, incomplete } };
+		return {
+			success: true,
+			data: {
+				total,
+				incomplete,
+				todayCompleted,
+				thisWeekCompleted,
+				thisMonthCompleted,
+			},
+		};
 	} catch (error) {
 		console.error('Error getting task progress stats:', error);
 		return { success: false, error: error.message };
