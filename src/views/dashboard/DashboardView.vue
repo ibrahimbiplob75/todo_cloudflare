@@ -7,21 +7,14 @@
         Welcome to your dashboard, <span class="font-semibold text-gray-800">{{ userName }}</span>!
       </p>
       
+      <div class="mt-4">
+        <TaskProgress />
+      </div>
+
       <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div class="p-4 bg-blue-50 rounded-lg">
-          <h3 class="font-semibold text-blue-800 mb-2">Profile</h3>
-          <p class="text-sm text-blue-600">Manage your profile information</p>
-        </div>
-        
-        <div class="p-4 bg-gray-50 rounded-lg opacity-50">
-          <h3 class="font-semibold text-gray-600 mb-2">Projects</h3>
-          <p class="text-sm text-gray-500">Coming soon</p>
-        </div>
-        
-        <div class="p-4 bg-gray-50 rounded-lg opacity-50">
-          <h3 class="font-semibold text-gray-600 mb-2">Todos</h3>
-          <p class="text-sm text-gray-500">Coming soon</p>
-        </div>
+        <TaskStatusAnalytics />
+        <ProjectAnalytics />
+        <MeetingAnalytics />
       </div>
     </div>
   </div>
@@ -29,9 +22,14 @@
 
 <script>
 import { useAuthStore } from '@stores/auth'
+import TaskProgress from '@components/task/TaskProgress.vue'
+import TaskStatusAnalytics from '@components/task/TaskStatusAnalytics.vue'
+import ProjectAnalytics from '@components/project/ProjectAnalytics.vue'
+import MeetingAnalytics from '@components/meeting/MeetingAnalytics.vue'
 
 export default {
   name: 'DashboardView',
+  components: { TaskProgress, TaskStatusAnalytics, ProjectAnalytics, MeetingAnalytics },
   computed: {
     userName() {
       return useAuthStore().userName
