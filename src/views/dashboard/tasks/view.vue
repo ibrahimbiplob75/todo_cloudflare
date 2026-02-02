@@ -87,6 +87,10 @@
           <h3 class="text-sm font-medium text-gray-500 mb-1">Execution Date</h3>
           <p class="text-gray-800">{{ formatDateTime(task.executionDate) }}</p>
         </div>
+        <div v-if="task.targetDate">
+          <h3 class="text-sm font-medium text-gray-500 mb-1">Target Date</h3>
+          <p class="text-gray-800">{{ formatDateTime(task.targetDate) }}</p>
+        </div>
         <div v-if="task.completionDate">
           <h3 class="text-sm font-medium text-gray-500 mb-1">Completion Date</h3>
           <p class="text-gray-800">{{ formatDateTime(task.completionDate) }}</p>

@@ -215,6 +215,8 @@ export async function handleTaskRoutes(request, prisma, corsHeaders, env = {}) {
 			if (searchParams.has('to_date')) filters.to_date = searchParams.get('to_date');
 			if (searchParams.has('submission_date_from')) filters.submission_date_from = searchParams.get('submission_date_from');
 			if (searchParams.has('submission_date_to')) filters.submission_date_to = searchParams.get('submission_date_to');
+			if (searchParams.has('target_date_from')) filters.target_date_from = searchParams.get('target_date_from');
+			if (searchParams.has('target_date_to')) filters.target_date_to = searchParams.get('target_date_to');
 			if (searchParams.has('show_all')) {
 				const v = searchParams.get('show_all');
 				filters.show_all = v === '1' || v === 'true';

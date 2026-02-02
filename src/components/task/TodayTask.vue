@@ -18,7 +18,7 @@
         <div class="task_title">
           {{ task.title }}
           <i
-            class="fas fa-eye fa-xs font-[6px] hover:text-blue-500 cursor-pointer ml-1"
+            class="fas fa-eye fa-xs font-[6px] hover:text-blue-500 cursor-pointer ml-1 !print:hidden"
             @click.stop="$router.push(`/tasks/${task.id}`)"
             title="View task"
           ></i>
