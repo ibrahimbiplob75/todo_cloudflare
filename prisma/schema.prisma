@@ -45,6 +45,7 @@ model Task {
   submissionDate DateTime? @map("submission_date")
   executionDate  DateTime? @map("execution_date")
   completionDate DateTime? @map("completion_date")
+  targetDate DateTime? @map("target_date")
   totalDuration  Int?      @default(0) @map("total_duration") // Duration in minutes
   assignedTo     Int?      @map("assigned_to")
   comment        String?

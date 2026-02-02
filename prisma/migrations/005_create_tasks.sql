@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS "tasks" (
     "priority" TEXT NOT NULL DEFAULT 'mid',
     "task_status" TEXT NOT NULL DEFAULT 'pending',
     "submission_date" DATETIME,
+    "target_date" DATETIME,
     "execution_date" DATETIME,
     "completion_date" DATETIME,
     "total_duration" INTEGER DEFAULT 0,
