@@ -251,28 +251,28 @@ export async function listTasks(prisma, filters = {}) {
 		}
 		if (filters.priority !== undefined) where.priority = filters.priority;
 
-		// is_today_tasks: filter by target_date = today
-		const isTodayTasks = filters.is_today_tasks === true || filters.is_today_tasks === '1' || filters.is_today_tasks === 1;
-		if (isTodayTasks) {
-			const today = new Date();
-			today.setHours(0, 0, 0, 0);
-			const todayEnd = new Date(today);
-			todayEnd.setHours(23, 59, 59, 999);
-			where.targetDate = { gte: today, lte: todayEnd };
-		}
-
 		const hasDateRange = filters.from_date != null && filters.to_date != null &&
 			String(filters.from_date).trim() !== '' && String(filters.to_date).trim() !== '';
-			
+
 		const hasTargetDateRange = filters.target_date_from != null && filters.target_date_to != null &&
 			String(filters.target_date_from).trim() !== '' && String(filters.target_date_to).trim() !== '';
 
+		// target_date range OR is_today_tasks (default today when no range)
 		if (hasTargetDateRange) {
 			const targetFrom = new Date(filters.target_date_from);
 			targetFrom.setHours(0, 0, 0, 0);
 			const targetTo = new Date(filters.target_date_to);
 			targetTo.setHours(23, 59, 59, 999);
 			where.targetDate = { gte: targetFrom, lte: targetTo };
+		} else {
+			const isTodayTasks = filters.is_today_tasks === true || filters.is_today_tasks === '1' || filters.is_today_tasks === 1;
+			if (isTodayTasks) {
+				const today = new Date();
+				today.setHours(0, 0, 0, 0);
+				const todayEnd = new Date(today);
+				todayEnd.setHours(23, 59, 59, 999);
+				where.targetDate = { gte: today, lte: todayEnd };
+			}
 		}
 
 		if (hasDateRange) {
@@ -645,6 +645,7 @@ export async function createTask(prisma, taskData) {
 			submissionDate,
 			executionDate,
 			completionDate,
+			targetDate,
 			assignedTo,
 			comment,
 		} = taskData;
@@ -768,6 +769,7 @@ export async function createTask(prisma, taskData) {
 				submissionDate: submissionDate ? new Date(submissionDate) : new Date(),
 				executionDate: executionDate ? new Date(executionDate) : null,
 				completionDate: completionDate ? new Date(completionDate) : null,
+				targetDate: targetDate ? new Date(targetDate) : null,
 				totalDuration,
 				assignedTo: assignedTo || null,
 				comment: comment || null,
@@ -855,6 +857,9 @@ export async function updateTask(prisma, id, taskData) {
 		}
 		if (taskData.completionDate !== undefined) {
 			updateData.completionDate = taskData.completionDate ? new Date(taskData.completionDate) : null;
+		}
+		if (taskData.targetDate !== undefined) {
+			updateData.targetDate = taskData.targetDate ? new Date(taskData.targetDate) : null;
 		}
 		if (taskData.assignedTo !== undefined) {
 			updateData.assignedTo = taskData.assignedTo || null;

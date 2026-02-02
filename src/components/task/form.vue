@@ -186,16 +186,29 @@
       </div>
     </div>
 
-    <div>
-      <label for="completionDate" class="block text-sm font-medium text-gray-700 mb-1">
-        Completion Date
-      </label>
-      <input
-        id="completionDate"
-        v-model="formData.completionDate"
-        type="datetime-local"
-        class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-      />
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label for="targetDate" class="block text-sm font-medium text-gray-700 mb-1">
+          Target Date
+        </label>
+        <input
+          id="targetDate"
+          v-model="formData.targetDate"
+          type="datetime-local"
+          class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+        />
+      </div>
+      <div>
+        <label for="completionDate" class="block text-sm font-medium text-gray-700 mb-1">
+          Completion Date
+        </label>
+        <input
+          id="completionDate"
+          v-model="formData.completionDate"
+          type="datetime-local"
+          class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+        />
+      </div>
     </div>
 
     <div>
@@ -286,6 +299,7 @@ export default {
         submissionDate: '',
         executionDate: '',
         completionDate: '',
+        targetDate: '',
         comment: '',
       },
       taskItems: [],
@@ -349,6 +363,7 @@ export default {
             submissionDate: this.formatDateTimeLocal(newTask.submissionDate),
             executionDate: this.formatDateTimeLocal(newTask.executionDate),
             completionDate: this.formatDateTimeLocal(newTask.completionDate),
+            targetDate: this.formatDateTimeLocal(newTask.targetDate),
             comment: newTask.comment || '',
           }
           this.taskItems = []
@@ -369,6 +384,7 @@ export default {
             submissionDate: '',
             executionDate: '',
             completionDate: '',
+            targetDate: '',
             comment: '',
           }
           this.taskItems = [this.newTaskItem()]
@@ -512,6 +528,7 @@ export default {
         submissionDate: this.formData.submissionDate || null,
         executionDate: this.formData.executionDate || null,
         completionDate: this.formData.completionDate || null,
+        targetDate: this.formData.targetDate || null,
         comment: this.formData.comment?.trim() || null,
       }
 
