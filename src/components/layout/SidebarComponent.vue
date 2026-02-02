@@ -10,7 +10,7 @@
   <aside
     :class="[
       'fixed md:static top-0 left-0 h-full bg-white border-r border-gray-200 z-50 transition-transform duration-300 ease-in-out',
-      'w-64 max-w-[300px]',
+      'w-64 max-w-[300px] min-w-[250px]',
       sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
     ]"
   >
@@ -30,7 +30,7 @@
             item.disabled ? 'opacity-50 cursor-not-allowed' : ''
           ]"
         >
-          <i :class="['fas', item.icon, 'w-5']"></i>
+          <i :class="[...(item.icon.includes(' ') ? item.icon.split(' ') : ['fas', item.icon]), 'w-5']"></i>
           <span>{{ item.label }}</span>
         </router-link>
       </nav>
@@ -63,6 +63,7 @@ export default {
         { name: 'project', label: 'Projects', to: '/projects', icon: 'fa-folder', disabled: false },
         { name: 'meetings', label: 'Meetings', to: '/meetings', icon: 'fa-calendar-alt', disabled: false },
         { name: 'tasks', label: 'Tasks', to: '/tasks', icon: 'fa-tasks', disabled: false },
+        { name: 'today-tasks', label: 'Today Tasks', to: '/today-tasks', icon: 'far fa-square', disabled: false },
         { name: 'completed-tasks', label: 'Completed Tasks', to: '/completed-tasks', icon: 'fa-check-square', disabled: false },
         { name: 'kanban', label: 'Kanban Board', to: '/kanban-board', icon: 'fa-columns', disabled: false },
       ],
@@ -117,6 +118,9 @@ export default {
         return true
       }
 
+      if (route === '/today-tasks' && this.$route.path.startsWith('/today-tasks')) {
+        return true
+      }
       if (route === '/completed-tasks' && this.$route.path.startsWith('/completed-tasks')) {
         return true
       }

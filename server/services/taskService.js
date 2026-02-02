@@ -242,11 +242,39 @@ export async function listTasks(prisma, filters = {}) {
 			if (!isNaN(mid)) where.projectMeetingId = mid;
 		}
 		if (filters.assignedTo !== undefined) where.assignedTo = filters.assignedTo;
-		if (filters.taskStatus !== undefined) where.taskStatus = filters.taskStatus;
+		if (filters.taskStatus !== undefined) {
+			if (filters.taskStatus === 'not_completed') {
+				where.taskStatus = { not: 'completed' };
+			} else {
+				where.taskStatus = filters.taskStatus;
+			}
+		}
 		if (filters.priority !== undefined) where.priority = filters.priority;
+
+		// is_today_tasks: filter by target_date = today
+		const isTodayTasks = filters.is_today_tasks === true || filters.is_today_tasks === '1' || filters.is_today_tasks === 1;
+		if (isTodayTasks) {
+			const today = new Date();
+			today.setHours(0, 0, 0, 0);
+			const todayEnd = new Date(today);
+			todayEnd.setHours(23, 59, 59, 999);
+			where.targetDate = { gte: today, lte: todayEnd };
+		}
 
 		const hasDateRange = filters.from_date != null && filters.to_date != null &&
 			String(filters.from_date).trim() !== '' && String(filters.to_date).trim() !== '';
+			
+		const hasTargetDateRange = filters.target_date_from != null && filters.target_date_to != null &&
+			String(filters.target_date_from).trim() !== '' && String(filters.target_date_to).trim() !== '';
+
+		if (hasTargetDateRange) {
+			const targetFrom = new Date(filters.target_date_from);
+			targetFrom.setHours(0, 0, 0, 0);
+			const targetTo = new Date(filters.target_date_to);
+			targetTo.setHours(23, 59, 59, 999);
+			where.targetDate = { gte: targetFrom, lte: targetTo };
+		}
+
 		if (hasDateRange) {
 			const fromStart = new Date(filters.from_date);
 			fromStart.setHours(0, 0, 0, 0);
@@ -1006,6 +1034,39 @@ export async function deleteTask(prisma, id) {
 			};
 		}
 
+		return { success: false, error: error.message };
+	}
+}
+
+/**
+ * Set target date for a task (used by "Add to Todo")
+ * @param {PrismaClient} prisma - Prisma client instance
+ * @param {number} taskId - Task ID
+ * @param {string|Date|null} targetDate - Target date (ISO string or Date); if empty, uses now()
+ * @returns {Promise<Object>} Updated task object
+ */
+export async function setTargetDate(prisma, taskId, targetDate = null) {
+	try {
+		const id = parseInt(taskId, 10);
+		if (isNaN(id)) return { success: false, error: 'Invalid task ID', statusCode: 400 };
+
+		const existing = await prisma.task.findUnique({ where: { id } });
+		if (!existing) return { success: false, error: 'Task not found', statusCode: 404 };
+
+		const value =
+			targetDate != null && String(targetDate).trim() !== ''
+				? new Date(targetDate)
+				: new Date();
+		if (isNaN(value.getTime())) return { success: false, error: 'Invalid target date', statusCode: 400 };
+
+		const updated = await prisma.task.update({
+			where: { id },
+			data: { targetDate: value, updatedAt: new Date() },
+		});
+
+		return { success: true, data: updated };
+	} catch (error) {
+		console.error('Error setting target date:', error);
 		return { success: false, error: error.message };
 	}
 }

@@ -266,6 +266,32 @@ export const useTaskStore = defineStore('task', {
     },
 
     /**
+     * Set target date (Add to Todo) - targetDate defaults to now if empty
+     */
+    async setTargetDate(taskId, targetDate = null) {
+      const id = parseInt(taskId)
+      if (isNaN(id)) return { success: false, error: 'Invalid task ID' }
+      try {
+        const response = await api.post('/task/set-target-date', {
+          task_id: id,
+          target_date: targetDate || null,
+        })
+        const task = response.data.task
+        const index = this.tasks.findIndex((p) => p.id === id)
+        if (index >= 0) {
+          this.tasks[index] = task
+        }
+        if (this.currentTask?.id === id) {
+          this.currentTask = task
+        }
+        return { success: true, data: task }
+      } catch (error) {
+        const err = error.response?.data?.error || error.message || 'Failed to set target date'
+        return { success: false, error: err }
+      }
+    },
+
+    /**
      * Soft delete task (hide from UI, no API)
      */
     softDeleteTask(id) {

@@ -219,6 +219,10 @@ export async function handleTaskRoutes(request, prisma, corsHeaders, env = {}) {
 				const v = searchParams.get('show_all');
 				filters.show_all = v === '1' || v === 'true';
 			}
+			if (searchParams.has('is_today_tasks')) {
+				const v = searchParams.get('is_today_tasks');
+				filters.is_today_tasks = v === '1' || v === 'true';
+			}
 			if (searchParams.has('page')) filters.page = parseInt(searchParams.get('page'), 10) || 1;
 			if (searchParams.has('per_page')) filters.per_page = parseInt(searchParams.get('per_page'), 10) || 20;
 
@@ -336,6 +340,41 @@ export async function handleTaskRoutes(request, prisma, corsHeaders, env = {}) {
 			return Response.json(
 				{ error: 'Invalid request body' },
 				{ status: 400, headers: corsHeaders }
+			);
+		}
+	}
+
+	// POST /task/set-target-date - Set task target date (Add to Todo)
+	if (pathname === "/task/set-target-date" && method === 'POST') {
+		try {
+			const userId = await getUserId();
+			if (!userId) {
+				return Response.json(
+					{ error: 'Authentication required' },
+					{ status: 401, headers: corsHeaders }
+				);
+			}
+			const body = await request.json().catch(() => ({}));
+			const { task_id, target_date } = body;
+			if (!task_id) {
+				return Response.json(
+					{ error: 'task_id is required' },
+					{ status: 400, headers: corsHeaders }
+				);
+			}
+			const result = await taskService.setTargetDate(prisma, task_id, target_date ?? null);
+			if (result.success) {
+				return Response.json({ task: result.data }, { headers: corsHeaders });
+			}
+			return Response.json(
+				{ error: result.error },
+				{ status: result.statusCode || 500, headers: corsHeaders }
+			);
+		} catch (error) {
+			console.error('Set target date error:', error);
+			return Response.json(
+				{ error: 'Failed to set target date' },
+				{ status: 500, headers: corsHeaders }
 			);
 		}
 	}

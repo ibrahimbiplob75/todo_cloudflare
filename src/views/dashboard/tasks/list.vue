@@ -49,6 +49,7 @@
           :task="task"
           @start="handleStartTask"
           @complete="handleCompleteTask"
+          @addToTodo="handleAddToTodo"
           @delete="handleSoftDelete"
         />
       </div>
@@ -133,6 +134,7 @@
 </template>
 
 <script>
+import Swal from 'sweetalert2'
 import { useTaskStore } from '@stores/task'
 import TaskCard from '@components/task/TaskCard.vue'
 import QuickAddBar from '@components/task/QuickAddBar.vue'
@@ -293,6 +295,23 @@ export default {
         await this.fetchTasks(true)
       } else {
         alert(result.error || 'Failed to update task')
+      }
+    },
+    async handleAddToTodo(taskId) {
+      const result = await this.taskStore.setTargetDate(taskId)
+      if (result.success) {
+        Swal.fire({
+          icon: 'success',
+          title: 'Added to todo!',
+          toast: true,
+          position: 'top-end',
+          showConfirmButton: false,
+          timer: 2000,
+          timerProgressBar: true,
+        })
+        await this.fetchTasks(true)
+      } else {
+        alert(result.error || 'Failed to add to todo')
       }
     },
     async handleSoftDelete(taskId) {

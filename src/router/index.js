@@ -95,6 +95,12 @@ const router = createRouter({
       meta: { middleware: 'private', layout: 'private' },
     },
     {
+      path: '/today-tasks',
+      name: 'today-tasks',
+      component: () => import('@views/dashboard/today-tasks/index.vue'),
+      meta: { middleware: 'private', layout: 'private' },
+    },
+    {
       path: '/completed-tasks',
       name: 'completed-tasks',
       component: () => import('@views/dashboard/completed-tasks/index.vue'),

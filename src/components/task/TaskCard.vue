@@ -82,6 +82,22 @@
       </button>
 
       <button
+        v-if="task.taskStatus !== 'completed'"
+        @click.stop="!isTargetDateToday && addToTodo()"
+        :disabled="isTargetDateToday"
+        :class="[
+          'px-3 py-1 rounded text-sm transition-colors',
+          isTargetDateToday
+            ? 'bg-amber-100 text-amber-500 cursor-default'
+            : 'bg-amber-50 text-amber-600 hover:bg-amber-100'
+        ]"
+        :title="isTargetDateToday ? 'Already added to todo today' : 'Add to Todo (set target date to today)'"
+      >
+        <i class="fas fa-list-check mr-1"></i>
+        {{ isTargetDateToday ? 'Added into todo' : 'Add to Todo' }}
+      </button>
+
+      <button
         @click.stop="editTask"
         class="px-3 py-1 bg-gray-50 text-gray-600 rounded text-sm hover:bg-gray-100 transition-colors"
       >
@@ -150,6 +166,18 @@ export default {
     hasSubtasks() {
       return (this.task.totalSubTasks || 0) > 0
     },
+    isTargetDateToday() {
+      const td = this.task.targetDate
+      if (!td) return false
+      const d = new Date(td)
+      if (isNaN(d.getTime())) return false
+      const today = new Date()
+      return (
+        d.getFullYear() === today.getFullYear() &&
+        d.getMonth() === today.getMonth() &&
+        d.getDate() === today.getDate()
+      )
+    },
   },
   methods: {
     viewTask() {
@@ -169,6 +197,9 @@ export default {
     },
     completeTask() {
       this.$emit('complete', this.task.id)
+    },
+    addToTodo() {
+      this.$emit('addToTodo', this.task.id)
     },
     async softDeleteTask() {
       const { isConfirmed } = await Swal.fire({

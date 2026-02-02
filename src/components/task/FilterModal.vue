@@ -93,6 +93,28 @@
             </div>
           </div>
         </div>
+        
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Target date range</label>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">From</label>
+              <input
+                v-model="localFilters.target_date_from"
+                type="date"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+              />
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">To</label>
+              <input
+                v-model="localFilters.target_date_to"
+                type="date"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+              />
+            </div>
+          </div>
+        </div>
 
         <div class="flex gap-3 pt-4 border-t">
           <button
@@ -143,6 +165,7 @@ export default {
         submission_date_to: null,
       },
       statusOptions: [
+        { value: 'not_completed', label: 'Not Completed' },
         { value: 'pending', label: 'Pending' },
         { value: 'in_progress', label: 'In Progress' },
         { value: 'completed', label: 'Completed' },
