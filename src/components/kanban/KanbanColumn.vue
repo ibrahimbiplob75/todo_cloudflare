@@ -31,6 +31,7 @@
         :task="task"
         :status="status"
         :is-dragging="draggingTaskId === task.id"
+        @drop="(e, id) => $emit('drop', e, id)"
         @drag-start="$emit('drag-start', $event)"
         @drag-end="$emit('drag-end')"
       />
@@ -60,9 +61,15 @@ export default {
     onDragLeave() {
       this.$emit('drag-leave')
     },
-    onDrop(e) {
+    onDrop(e, dragedOnCardId = null) {
       e.preventDefault()
-      this.$emit('drop', e)
+      e.stopPropagation()
+      if (dragedOnCardId == null) {
+        const el = document.elementFromPoint(e.clientX, e.clientY)
+        const cardEl = el?.closest('[data-task-id]')
+        dragedOnCardId = cardEl ? parseInt(cardEl.dataset.taskId, 10) : null
+      }
+      this.$emit('drop', e, dragedOnCardId)
     },
   },
 }

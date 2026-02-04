@@ -3,10 +3,16 @@
     class="kanban-card group cursor-grab active:cursor-grabbing bg-white rounded-lg shadow-sm border border-gray-200 p-3 hover:shadow-md transition-all duration-200 hover:border-blue-300"
     :class="{ 'opacity-50 ring-2 ring-blue-400': isDragging }"
     draggable="true"
+    :data-task-id="task.id"
+    :data-task-serial="task.serial"
+    @dragover.prevent
+    @drop="onDrop"
     @dragstart="onDragStart"
     @dragend="onDragEnd"
   >
-    <div class="text-sm font-medium text-gray-800 line-clamp-2">{{ task.title }}</div>
+    <div class="text-sm font-medium text-gray-800 line-clamp-2">
+      {{ task.title }} - {{ task.id }}
+    </div>
     <div v-if="task.priority" class="mt-1">
       <span
         class="inline-block px-1.5 py-0.5 text-xs rounded"
@@ -42,6 +48,11 @@ export default {
       }))
       e.dataTransfer.setData('text/plain', String(this.task.id))
       this.$emit('drag-start', this.task)
+    },
+    onDrop(e) {
+      e.preventDefault()
+      e.stopPropagation()
+      this.$emit('drop', e, this.task.id)
     },
     onDragEnd() {
       this.$emit('drag-end')
