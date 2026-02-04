@@ -50,6 +50,28 @@
             </div>
           </div>
           <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              Projects
+            </label>
+            <select
+              v-model="active_project_id"
+              class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+              :disabled="loadingProjects"
+              @change="onProjectChange"
+            >
+              <option :value="null" disabled>
+                {{ loadingProjects ? "Loading..." : "Select project" }}
+              </option>
+              <option
+                v-for="p in allProjects"
+                :key="p.id"
+                :value="p.id"
+              >
+                {{ p.title }}
+              </option>
+            </select>
+          </div>
+          <div>
             <label class="block text-sm font-medium text-gray-700 mb-1"
               >Meeting</label
             >
@@ -66,6 +88,7 @@
               </option>
             </select>
           </div>
+
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1"
               >Date Type</label
@@ -255,12 +278,14 @@ export default {
   components: { ProjectDetailTask },
   data() {
     return {
+      active_project_id: null,
       project: null,
       loadingProject: false,
       errorProject: null,
       loadingTasks: false,
       errorTasks: null,
       loadingMeetings: false,
+      loadingProjects: false,
       meetings: [],
       tasks: [],
       filters: {
@@ -277,7 +302,11 @@ export default {
   },
   computed: {
     projectId() {
-      return this.$route.params.id ?? this.$route.params.projectId;
+      return this.active_project_id;
+    },
+    allProjects() {
+      const store = useProjectStore();
+      return store.projects || [];
     },
     meetingIdFromRoute() {
       return this.$route.params.meetingId;
@@ -337,6 +366,12 @@ export default {
     },
   },
   watch: {
+    "$route.params"(params) {
+      const id = params.id ?? params.projectId;
+      if (id != null && String(id) !== String(this.active_project_id)) {
+        this.active_project_id = id ? parseInt(id, 10) : null;
+      }
+    },
     projectId() {
       this.applyMeetingFromRoute();
       this.fetchProject();
@@ -354,12 +389,33 @@ export default {
     },
   },
   async mounted() {
+    this.syncActiveProjectFromRoute();
+    this.loadingProjects = true;
+    try {
+      const store = useProjectStore();
+      await store.fetchProjects(true);
+    } finally {
+      this.loadingProjects = false;
+    }
     this.applyMeetingFromRoute();
     await this.fetchProject();
     await this.fetchMeetings();
     await this.fetchTasks();
   },
   methods: {
+    syncActiveProjectFromRoute() {
+      const id = this.$route.params.id ?? this.$route.params.projectId;
+      this.active_project_id = id ? parseInt(id, 10) : null;
+    },
+    onProjectChange() {
+      if (this.active_project_id == null) return;
+      const current = this.$route.params.id ?? this.$route.params.projectId;
+      if (String(this.active_project_id) === String(current)) return;
+      this.$router.push({
+        name: "project-details",
+        params: { id: this.active_project_id },
+      });
+    },
     applyMeetingFromRoute() {
       const mid = this.meetingIdFromRoute;
       if (mid) {
