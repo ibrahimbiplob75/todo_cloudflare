@@ -13,7 +13,7 @@
     <div v-else-if="store.error" class="bg-red-50 border border-red-200 rounded-lg p-4 text-red-600">
       {{ store.error }}
     </div>
-    <div v-else>
+    <div v-else class="overflow-x-auto">
       <KanbanBoard />
     </div>
   </div>
