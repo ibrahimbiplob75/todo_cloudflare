@@ -2,11 +2,25 @@
   <div class="task_block">
     <div class="task_item">
       <div class="icon">
-        <i class="far fa-check-square" aria-hidden="true"></i>
+        <i v-if="task.taskStatus === 'completed'" class="far fa-check-square" aria-hidden="true"></i>
+        <i v-else class="far fa-square" aria-hidden="true"></i>
       </div>
       <div class="task_details">
         <div class="task_title">{{ task.title }}</div>
-        <div class="task_meta">{{ submissionDateFormatted }}{{ projectPart }}</div>
+        <div class="task_meta">
+          {{ submissionDateFormatted }}
+          {{ projectPart }},
+          <span class="text-green-500">
+            {{ task.taskStatus }}
+          </span>
+          <span v-if="task.completionPercent > 0">
+            (
+              {{ task.completedSubTasks }} /
+              {{ task.totalSubTasks }},
+              {{ task.completionPercent }}%
+            )
+          </span>
+        </div>
       </div>
     </div>
     <div v-if="task.subtasks && task.subtasks.length > 0" class="subtasks_wrapper">
