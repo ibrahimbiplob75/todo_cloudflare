@@ -245,7 +245,52 @@ export async function listTasks(prisma, filters = {}) {
 		if (filters.taskStatus !== undefined) {
 			if (filters.taskStatus === 'not_completed') {
 				where.taskStatus = { not: 'completed' };
-			} else {
+			}
+
+			// COMPLETED
+			else if (filters.taskStatus === 'completed') {
+				where.OR = [
+					// Task itself completed
+					{ taskStatus: 'completed' },
+
+					// Task not completed, but ALL subtasks completed
+					{
+						taskStatus: { not: 'completed' },
+						subtasks: {
+							some: {}, // has subtasks
+							every: { taskStatus: 'completed' },
+						},
+					},
+				];
+			}
+
+			// PARTIALLY COMPLETED (subtasks-driven, parent ignored)
+			else if (filters.taskStatus === 'partially_completed') {
+				where.AND = [
+					// Must have subtasks
+					{
+						subtasks: {
+							some: {}, // at least one subtask exists
+						},
+					},
+
+					// At least one subtask completed
+					{
+						subtasks: {
+							some: { taskStatus: 'completed' },
+						},
+					},
+
+					// At least one subtask NOT completed
+					{
+						subtasks: {
+							some: { taskStatus: { not: 'completed' } },
+						},
+					},
+				];
+			}
+
+			else {
 				where.taskStatus = filters.taskStatus;
 			}
 		}
@@ -263,7 +308,21 @@ export async function listTasks(prisma, filters = {}) {
 			targetFrom.setHours(0, 0, 0, 0);
 			const targetTo = new Date(filters.target_date_to);
 			targetTo.setHours(23, 59, 59, 999);
-			where.targetDate = { gte: targetFrom, lte: targetTo };
+
+			where.OR = [
+				// 1️⃣ Parent task targetDate in range
+				{
+					targetDate: { gte: targetFrom, lte: targetTo },
+				},
+				// 2️⃣ At least one subtask targetDate in range
+				{
+					subtasks: {
+						some: {
+							targetDate: { gte: targetFrom, lte: targetTo },
+						},
+					},
+				},
+			];
 		} else {
 			const isTodayTasks = filters.is_today_tasks === true || filters.is_today_tasks === '1' || filters.is_today_tasks === 1;
 			if (isTodayTasks) {
@@ -275,12 +334,49 @@ export async function listTasks(prisma, filters = {}) {
 			}
 		}
 
-		if (hasDateRange) {
+		// if (hasDateRange) {
+		// 	const fromStart = new Date(filters.from_date);
+		// 	fromStart.setHours(0, 0, 0, 0);
+		// 	const toEnd = new Date(filters.to_date);
+		// 	toEnd.setHours(23, 59, 59, 999);
+		// 	where.completionDate = { gte: fromStart, lte: toEnd };
+		// }
+
+		if (
+			hasDateRange &&
+			filters.taskStatus === 'completed'
+		) {
 			const fromStart = new Date(filters.from_date);
 			fromStart.setHours(0, 0, 0, 0);
+
 			const toEnd = new Date(filters.to_date);
 			toEnd.setHours(23, 59, 59, 999);
-			where.completionDate = { gte: fromStart, lte: toEnd };
+
+			where.completionDate = {
+				gte: fromStart,
+				lte: toEnd,
+			};
+		}
+
+		// Date filter for PARTIALLY COMPLETED tasks (subtask-based)
+		if (
+			hasDateRange &&
+			filters.taskStatus === 'partially_completed'
+		) {
+			const fromStart = new Date(filters.from_date);
+			fromStart.setHours(0, 0, 0, 0);
+
+			const toEnd = new Date(filters.to_date);
+			toEnd.setHours(23, 59, 59, 999);
+
+			where.subtasks = {
+				some: {
+					completionDate: {
+						gte: fromStart,
+						lte: toEnd,
+					},
+				},
+			};
 		}
 
 		const hasSubmissionDateRange = filters.submission_date_from != null && filters.submission_date_to != null &&
@@ -301,52 +397,123 @@ export async function listTasks(prisma, filters = {}) {
 		let tasks;
 		let total;
 
+		let subtaskInclude;
+
+		// Compute targetDate filter once
+		let targetDateFilter = undefined;
+		if (hasTargetDateRange) {
+			const targetFrom = new Date(filters.target_date_from);
+			targetFrom.setHours(0, 0, 0, 0);
+			const targetTo = new Date(filters.target_date_to);
+			targetTo.setHours(23, 59, 59, 999);
+
+			targetDateFilter = { gte: targetFrom, lte: targetTo };
+		}
+
+		// Build subtask include
+		if (filters.taskStatus === 'partially_completed') {
+			subtaskInclude = {
+				where: {
+					taskStatus: 'completed',
+					...(targetDateFilter ? { targetDate: targetDateFilter } : {}),
+				},
+				select: {
+					id: true,
+					title: true,
+					taskStatus: true,
+					submissionDate: true,
+					targetDate: true, // optional
+					progressPercent: true,
+				},
+			};
+		} else {
+			subtaskInclude = {
+				where: {
+					...(targetDateFilter ? { targetDate: targetDateFilter } : {}),
+				},
+				select: {
+					id: true,
+					title: true,
+					taskStatus: true,
+					submissionDate: true,
+					targetDate: true,
+					progressPercent: true,
+				},
+			};
+		}
+
 		if (showAll) {
 			tasks = await prisma.task.findMany({
 				where,
 				orderBy,
 				include: {
-					subtasks: {
-						select: { id: true, title: true, taskStatus: true, submissionDate: true },
-					},
+					subtasks: subtaskInclude,
 				},
 			});
 			total = tasks.length;
 		} else {
 			total = await prisma.task.count({ where });
 			const skip = (page - 1) * perPage;
+
 			tasks = await prisma.task.findMany({
 				where,
 				orderBy,
 				skip,
 				take: perPage,
 				include: {
-					subtasks: {
-						select: { id: true, title: true, taskStatus: true, submissionDate: true },
-					},
+					subtasks: subtaskInclude,
 				},
 			});
 		}
 
 		const projectIds = [...new Set(tasks.map(t => t.projectId).filter(Boolean))];
 		const meetingIds = [...new Set(tasks.map(t => t.projectMeetingId).filter(Boolean))];
-		const [projects, meetings] = await Promise.all([
+		const taskIds = tasks.map(t => t.id);
+		const parentTaskIds = [...new Set(tasks.map(t => t.parentTaskId).filter(Boolean))];
+
+		const [projects, meetings, completedByParent, totalByParent, parentTasks] = await Promise.all([
 			projectIds.length > 0
 				? prisma.project.findMany({ where: { id: { in: projectIds } }, select: { id: true, title: true } })
 				: [],
 			meetingIds.length > 0
 				? prisma.meeting.findMany({ where: { id: { in: meetingIds } }, select: { id: true, title: true } })
 				: [],
+			taskIds.length > 0
+				? prisma.task.groupBy({
+					by: ['parentTaskId'],
+					where: { parentTaskId: { in: taskIds }, taskStatus: 'completed' },
+					_count: { id: true },
+				})
+				: [],
+			taskIds.length > 0
+				? prisma.task.groupBy({
+					by: ['parentTaskId'],
+					where: { parentTaskId: { in: taskIds } },
+					_count: { id: true },
+				})
+				: [],
+			parentTaskIds.length > 0
+				? prisma.task.findMany({
+					where: { id: { in: parentTaskIds } },
+					select: { id: true, title: true },
+				})
+				: [],
 		]);
-		const projectById = new Map(projects.map(p => [p.id, p.title]));
-		const meetingById = new Map(meetings.map(m => [m.id, m.title]));
+
+		const completedCountByParent = new Map((completedByParent || []).map(p => [p.parentTaskId, p._count.id]));
+		const totalCountByParent = new Map((totalByParent || []).map(p => [p.parentTaskId, p._count.id]));
+		const parentTaskById = new Map((parentTasks || []).map(p => [p.id, p]));
+
+		const projectById = new Map((projects || []).map(p => [p.id, p.title]));
+		const meetingById = new Map((meetings || []).map(m => [m.id, m.title]));
 
 		const tasksWithCounts = tasks.map(task => {
 			const rawSubtasks = task.subtasks || [];
-			const completedSubtasks = rawSubtasks.filter(st => st.taskStatus === 'completed').length;
-			const incompletedSubtasks = rawSubtasks.length - completedSubtasks;
-			const completionPercent = rawSubtasks.length > 0
-				? Math.round((completedSubtasks / rawSubtasks.length) * 100)
+			const completedSubtasks = completedCountByParent.get(task.id) ?? 0;
+			const totalSubs = totalCountByParent.get(task.id) ?? rawSubtasks.length;
+			const incompletedSubtasks = totalSubs - completedSubtasks;
+			const completionPercent = totalSubs > 0
+				? Math.round((completedSubtasks / totalSubs) * 100)
 				: 0;
 			const projectName = task.projectId ? (projectById.get(task.projectId) ?? null) : null;
 			const subtasks = rawSubtasks.map(st => ({
@@ -355,16 +522,25 @@ export async function listTasks(prisma, filters = {}) {
 				taskStatus: st.taskStatus,
 				submissionDate: st.submissionDate ?? null,
 				projectName,
+				progressPercent: st.progressPercent ?? 0,
+				parent_task_info: { parent_task_title: task.title },
 			}));
+			const parentTaskInfo = task.parentTaskId
+				? {
+					parent_task_title: parentTaskById.get(task.parentTaskId)?.title ?? null,
+				}
+				: null;
+
 			return {
 				...task,
 				subtasks,
-				totalSubTasks: subtasks.length,
+				totalSubTasks: totalSubs,
 				completedSubTasks: completedSubtasks,
 				incompletedSubTasks: incompletedSubtasks,
 				completionPercent,
 				projectName,
 				meetingName: task.projectMeetingId ? (meetingById.get(task.projectMeetingId) ?? null) : null,
+				parent_task_info: parentTaskInfo,
 			};
 		});
 
@@ -486,6 +662,7 @@ export async function getProjectTasks(prisma, projectId, filters = {}) {
 						description: true,
 						comment: true,
 						taskStatus: true,
+						progressPercent: true,
 					},
 				},
 			},
@@ -495,9 +672,9 @@ export async function getProjectTasks(prisma, projectId, filters = {}) {
 		const meetings =
 			meetingIds.length > 0
 				? await prisma.meeting.findMany({
-						where: { id: { in: meetingIds } },
-						select: { id: true, title: true },
-					})
+					where: { id: { in: meetingIds } },
+					select: { id: true, title: true },
+				})
 				: [];
 		const meetingById = new Map(meetings.map((m) => [m.id, m.title]));
 
@@ -536,6 +713,7 @@ export async function getTaskById(prisma, id) {
 
 		let projectName = null;
 		let meetingName = null;
+		let parentTaskInfo = null;
 		if (task.projectId) {
 			const project = await prisma.project.findUnique({
 				where: { id: task.projectId },
@@ -550,6 +728,13 @@ export async function getTaskById(prisma, id) {
 			});
 			meetingName = meeting?.title ?? null;
 		}
+		if (task.parentTaskId) {
+			const parentTask = await prisma.task.findUnique({
+				where: { id: task.parentTaskId },
+				select: { title: true },
+			});
+			parentTaskInfo = { title: parentTask?.title ?? null };
+		}
 
 		return {
 			success: true,
@@ -557,6 +742,7 @@ export async function getTaskById(prisma, id) {
 				...task,
 				projectName,
 				meetingName,
+				parent_task_info: parentTaskInfo,
 			},
 		};
 	} catch (error) {
@@ -642,6 +828,7 @@ export async function createTask(prisma, taskData) {
 			parentTaskId,
 			priority = 'mid',
 			taskStatus = 'pending',
+			progressPercent,
 			submissionDate,
 			executionDate,
 			completionDate,
@@ -649,6 +836,10 @@ export async function createTask(prisma, taskData) {
 			assignedTo,
 			comment,
 		} = taskData;
+
+		const clampedProgress = taskStatus === 'completed'
+			? 100
+			: (progressPercent != null ? Math.max(0, Math.min(100, parseInt(progressPercent, 10) || 0)) : 0);
 
 		// Validation
 		if (!title) {
@@ -766,6 +957,7 @@ export async function createTask(prisma, taskData) {
 				parentTaskId: parentTaskId || null,
 				priority,
 				taskStatus,
+				progressPercent: clampedProgress,
 				submissionDate: submissionDate ? new Date(submissionDate) : new Date(),
 				executionDate: executionDate ? new Date(executionDate) : null,
 				completionDate: completionDate ? new Date(completionDate) : null,
@@ -848,6 +1040,13 @@ export async function updateTask(prisma, id, taskData) {
 				};
 			}
 			updateData.taskStatus = taskData.taskStatus;
+			if (taskData.taskStatus === 'completed') {
+				updateData.progressPercent = 100;
+			}
+		}
+		if (taskData.progressPercent !== undefined && updateData.progressPercent === undefined) {
+			const raw = parseInt(taskData.progressPercent, 10) || 0;
+			updateData.progressPercent = Math.max(0, Math.min(100, raw));
 		}
 		if (taskData.submissionDate !== undefined) {
 			updateData.submissionDate = taskData.submissionDate ? new Date(taskData.submissionDate) : null;
@@ -1083,7 +1282,10 @@ const KANBAN_STATUSES = ['pending', 'in_progress', 'completed', 'failed', 'hold'
  */
 export async function getKanbanTasks(prisma, filters = {}) {
 	try {
-		const where = { status: 1, parentTaskId: null };
+		const where = {
+			status: 1,
+			// parentTaskId: null 
+		};
 		if (filters.project_id != null) where.projectId = parseInt(filters.project_id);
 		if (filters.meeting_id != null && filters.meeting_id !== '') {
 			where.projectMeetingId = parseInt(filters.meeting_id);
