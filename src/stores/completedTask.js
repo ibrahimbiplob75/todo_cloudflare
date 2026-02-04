@@ -56,7 +56,7 @@ export const useCompletedTaskStore = defineStore('completedTask', {
 
       try {
         const params = new URLSearchParams()
-        params.append('task_status', 'completed')
+        params.append('task_status', 'partially_completed')
         params.append('from_date', from)
         params.append('to_date', to)
         params.append('show_all', '1')
