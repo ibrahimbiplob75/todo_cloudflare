@@ -146,6 +146,13 @@
           <i class="fas fa-trash mr-2"></i>
           Remove Task
         </button>
+        <router-link
+          :to="{ name: 'task-subtasks-create', params: { id: taskId } }"
+          class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
+        >
+          <i class="fas fa-plus mr-2"></i>
+          Create Sub Task
+        </router-link>
       </div>
     </div>
   </div>
