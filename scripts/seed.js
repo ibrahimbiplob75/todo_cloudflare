@@ -74,8 +74,8 @@ for (const f of seedFiles) {
   const p = join(migrationsDir, f);
   console.log(`📄 ${f}`);
   try {
-    run(`npx wrangler d1 execute todo ${flag} --file=${p}`, true);
-    console.log(`✅ ${f} done\n`);
+    run(`npx wrangler d1 execute todo ${flag} --file="${p}"`, true);
+    console.log(`✅ "${f}" done\n`);
   } catch (e) {
     console.error(`❌ ${f} failed:`, e.message);
     process.exit(1);

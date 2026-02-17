@@ -1,64 +1,68 @@
-// This is your Prisma schema file for Cloudflare D1
-// D1 uses SQLite, so we use the sqlite provider
-
 generator client {
   provider = "prisma-client-js"
-  engineType = "client"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "mongodb"
+  
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
   name      String
-  email     String   @unique
+  email     String   
   password  String
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("users")
 }
 
 model Project {
-  id          Int      @id @default(autoincrement())
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
   title       String
   description String?
-  creator     Int
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  creator     String   @db.ObjectId
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@map("projects")
 }
 
 model Task {
-  id             Int       @id @default(autoincrement())
-  serial         Int?       @default(1) @map("serial")
-  projectId      Int?      @map("project_id")
-  projectMeetingId Int?    @map("project_meeting_id")
-  parentTaskId   Int?      @map("parent_task_id")
-  title          String
-  description    String?
-  priority       String    @default("mid") // low, mid, high, urgent
-  taskStatus     String    @default("pending") @map("task_status") // pending, in_progress, completed, failed, hold
-  progressPercent Int @default(0) @map("progress_percent")
-  submissionDate DateTime? @map("submission_date")
-  executionDate  DateTime? @map("execution_date")
-  completionDate DateTime? @map("completion_date")
-  targetDate DateTime? @map("target_date")
-  totalDuration  Int?      @default(0) @map("total_duration") // Duration in minutes
-  assignedTo     Int?      @map("assigned_to")
-  comment        String?
-  status         Int       @default(1) @map("status") // 1: active, 0: inactive
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
+  id               String    @id @default(auto()) @map("_id") @db.ObjectId
 
-  // Self-referential relationship
-  parentTask     Task?     @relation("TaskSubtasks", fields: [parentTaskId], references: [id], onDelete: Cascade)
-  subtasks       Task[]    @relation("TaskSubtasks")
+  serial           Int       @default(1)
+  title            String
+  description      String?
+
+  projectId        String?   @db.ObjectId
+  projectMeetingId String?   @db.ObjectId
+  parentTaskId     String?   @db.ObjectId
+  assignedTo       String?   @db.ObjectId
+
+  priority         String    @default("mid")
+  taskStatus       String    @default("pending")
+  progressPercent  Int       @default(0)
+
+  submissionDate   DateTime?
+  executionDate    DateTime?
+  completionDate   DateTime?
+  targetDate       DateTime?
+
+  totalDuration    Int       @default(0)
+  comment          String?
+  status           Int       @default(1)
+
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  // ✅ Correct single-line relation
+  parentTask Task? @relation("TaskSubtasks", fields: [parentTaskId], references: [id], onDelete: NoAction)
+  subtasks   Task[] @relation("TaskSubtasks")
 
   @@map("tasks")
+
   @@index([projectId])
   @@index([projectMeetingId])
   @@index([assignedTo])
@@ -66,13 +70,13 @@ model Task {
   @@index([priority])
   @@index([submissionDate])
   @@index([parentTaskId])
-  @@index([assignedTo, taskStatus])
-  @@index([taskStatus, submissionDate])
-  @@index([projectId, taskStatus, submissionDate])
 }
 
+
+
+
 model Todo {
-  id        Int      @id @default(autoincrement())
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
   title     String
   completed Boolean  @default(false)
   createdAt DateTime @default(now())
@@ -80,15 +84,15 @@ model Todo {
 }
 
 model Meeting {
-  id          Int      @id @default(autoincrement())
-  projectId   Int      @map("project_id")
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  projectId   String   @db.ObjectId
   title       String
   date        DateTime
   description String?
-  creator     Int
-  slug        String   @unique
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  creator     String   @db.ObjectId
+  slug        String   
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@map("project_meetings")
   @@index([projectId])
