@@ -76,7 +76,7 @@ for (const migration of migrationsToRun) {
   
   try {
     execSync(
-      `npx wrangler d1 execute todo ${flag} --file=${migrationPath}`,
+      `npx wrangler d1 execute todo ${flag} --file="${migrationPath}"`,
       { stdio: 'inherit', cwd: join(__dirname, '..') }
     );
     console.log(`✅ ${migration} completed\n`);

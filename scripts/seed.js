@@ -55,7 +55,7 @@ for (const m of createMigrations) {
   const p = join(migrationsDir, m);
   console.log(`📄 ${m}`);
   try {
-    run(`npx wrangler d1 execute todo ${flag} --file=${p}`, true);
+    run(`npx wrangler d1 execute todo ${flag} --file="${p}"`, true);
     console.log(`✅ ${m} done\n`);
   } catch (e) {
     console.error(`❌ ${m} failed:`, e.message);
@@ -74,7 +74,7 @@ for (const f of seedFiles) {
   const p = join(migrationsDir, f);
   console.log(`📄 ${f}`);
   try {
-    run(`npx wrangler d1 execute todo ${flag} --file=${p}`, true);
+    run(`npx wrangler d1 execute todo ${flag} --file="${p}"`, true);
     console.log(`✅ ${f} done\n`);
   } catch (e) {
     console.error(`❌ ${f} failed:`, e.message);
