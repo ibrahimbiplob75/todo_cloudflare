@@ -9,24 +9,15 @@ import { handleMeetingRoutes } from './routes/meetingRoutes.js';
 
 export default {
 	async fetch(request, env) {
-		const prisma = createPrismaClient(env.todo_db);
-
-		// CORS headers
+		const prisma = createPrismaClient(env.intellisoft_db);
 		const corsHeaders = {
 			'Access-Control-Allow-Origin': '*',
 			'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
 			'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 		};
-
-		// Handle CORS preflight
 		if (request.method === 'OPTIONS') {
 			return new Response(null, { headers: corsHeaders });
 		}
-
-		// Try to handle routes in order
-		// Each route handler returns a Response if matched, or null if not matched
-
-		// 1. General API routes
 		const apiResponse = await handleApiRoutes(request, corsHeaders);
 		if (apiResponse) return apiResponse;
 

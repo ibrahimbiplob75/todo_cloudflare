@@ -1,7 +1,7 @@
 
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "todo",
+	"name": "intellisoft task manager",
 	"compatibility_date": "2025-09-27",
 	"main": "server/index.js",
 	"assets": {
@@ -13,9 +13,9 @@
 	"compatibility_flags": ["nodejs_compat"],
 	"d1_databases": [
 		{
-		  "binding": "todo_db",
-		  "database_name": "todo",
-		  "database_id": "b73a6a8f-9e53-4714-bea8-d13dab102370"
+		  "binding": "intellisoft_db",
+		  "database_name": "intellisoft",
+		  "database_id": "6b615198-2cb6-45c2-a6f8-1c25d1fbc69a"
 		}
 	]
 }
