@@ -35,7 +35,7 @@ export default {
 		if (authResponse) return authResponse;
 
 		// 3. User routes
-		const userResponse = await handleUserRoutes(request, prisma, corsHeaders);
+		const userResponse = await handleUserRoutes(request, prisma, corsHeaders, env);
 		if (userResponse) return userResponse;
 
 		// 4. Project routes

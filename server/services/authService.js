@@ -25,6 +25,7 @@ export async function generateToken(user, env = {}) {
 		userId: user.id,
 		email: user.email,
 		name: user.name,
+		role: user.role || 'user',
 	})
 		.setProtectedHeader({ alg: JWT_ALGORITHM })
 		.setIssuedAt()
@@ -48,8 +49,57 @@ export async function verifyToken(token, env = {}) {
 		});
 		return payload;
 	} catch (error) {
-		console.error('Token verification failed:', error);
+		console.error('Token verification failed');
 		return null;
+	}
+}
+
+/**
+ * Get user with role support and fallback for older DBs without role column.
+ * @param {PrismaClient} prisma
+ * @param {number} userId
+ * @returns {Promise<Object|null>}
+ */
+async function findUserWithRoleFallback(prisma, userId) {
+	try {
+		return await prisma.user.findUnique({
+			where: { id: userId },
+			select: {
+				id: true,
+				name: true,
+				email: true,
+				role: true,
+				createdAt: true,
+				updatedAt: true,
+			},
+		});
+	} catch (error) {
+		const message = error?.message || '';
+		if (
+			message.includes('role') &&
+			(
+				message.includes('does not exist') ||
+				message.includes('Unknown column') ||
+				message.includes('no such column') ||
+				message.includes('Unknown field')
+			)
+		) {
+			const legacyUser = await prisma.user.findUnique({
+				where: { id: userId },
+				select: {
+					id: true,
+					name: true,
+					email: true,
+					createdAt: true,
+					updatedAt: true,
+				},
+			});
+
+			if (!legacyUser) return null;
+			return { ...legacyUser, role: 'user' };
+		}
+
+		throw error;
 	}
 }
 
@@ -99,6 +149,7 @@ export async function login(prisma, email, password, env = {}) {
 			id: user.id,
 			email: user.email,
 			name: user.name,
+			role: user.role,
 		}, env);
 
 		return {
@@ -109,13 +160,14 @@ export async function login(prisma, email, password, env = {}) {
 					id: user.id,
 					name: user.name,
 					email: user.email,
+					role: user.role,
 					createdAt: user.createdAt,
 					updatedAt: user.updatedAt,
 				},
 			},
 		};
 	} catch (error) {
-		console.error('Login error:', error);
+		console.error('Login error');
 		return {
 			success: false,
 			error: 'Login failed',
@@ -145,16 +197,7 @@ export async function getAuthenticatedUser(prisma, token, env = {}) {
 		}
 
 		// Get user from database
-		const user = await prisma.user.findUnique({
-			where: { id: payload.userId },
-			select: {
-				id: true,
-				name: true,
-				email: true,
-				createdAt: true,
-				updatedAt: true,
-			},
-		});
+		const user = await findUserWithRoleFallback(prisma, payload.userId);
 
 		if (!user) {
 			return {
@@ -169,7 +212,7 @@ export async function getAuthenticatedUser(prisma, token, env = {}) {
 			data: user,
 		};
 	} catch (error) {
-		console.error('Get authenticated user error:', error);
+		console.error('Get authenticated user error');
 		return {
 			success: false,
 			error: 'Authentication failed',
@@ -191,4 +234,44 @@ export function extractTokenFromRequest(request) {
 	}
 
 	return authHeader.substring(7); // Remove 'Bearer ' prefix
+}
+
+/**
+ * Resolve authenticated user from request token
+ * @param {PrismaClient} prisma - Prisma client instance
+ * @param {Request} request - HTTP request object
+ * @param {Object} env - Environment variables
+ * @returns {Promise<Object>} { success, data, error, statusCode }
+ */
+export async function getAuthUserFromRequest(prisma, request, env = {}) {
+	try {
+		const token = extractTokenFromRequest(request);
+		if (!token) {
+			return { success: false, error: 'Authentication required', statusCode: 401 };
+		}
+
+		const payload = await verifyToken(token, env);
+		if (!payload?.userId) {
+			return { success: false, error: 'Invalid or expired token', statusCode: 401 };
+		}
+
+		const user = await findUserWithRoleFallback(prisma, payload.userId);
+
+		if (!user) {
+			return { success: false, error: 'User not found', statusCode: 404 };
+		}
+
+		return {
+			success: true,
+			data: {
+				id: user.id,
+				name: user.name,
+				email: user.email,
+				role: user.role || 'user',
+			},
+		};
+	} catch (error) {
+		console.error('Get auth user from request error');
+		return { success: false, error: 'Authentication failed', statusCode: 401 };
+	}
 }

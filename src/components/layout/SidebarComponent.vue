@@ -55,9 +55,15 @@ import { useUIStore } from '@stores/ui'
 
 export default {
   name: 'SidebarComponent',
-  data() {
-    return {
-      navigationItems: [
+  computed: {
+    authStore() {
+      return useAuthStore()
+    },
+    isWatcher() {
+      return this.authStore.isWatcher
+    },
+    navigationItems() {
+      const items = [
         { name: 'dashboard', label: 'Home', to: '/dashboard', icon: 'fa-home' },
         { name: 'profile', label: 'Profile', to: '/profile', icon: 'fa-user' },
         { name: 'project', label: 'Projects', to: '/projects', icon: 'fa-folder', disabled: false },
@@ -66,10 +72,14 @@ export default {
         { name: 'today-tasks', label: 'Today Tasks', to: '/today-tasks', icon: 'far fa-square', disabled: false },
         { name: 'completed-tasks', label: 'Completed Tasks', to: '/completed-tasks', icon: 'fa-check-square', disabled: false },
         { name: 'kanban', label: 'Kanban Board', to: '/kanban-board', icon: 'fa-columns', disabled: false },
-      ],
-    }
-  },
-  computed: {
+      ]
+
+      if (this.isWatcher) {
+        items.push({ name: 'users', label: 'Users', to: '/users', icon: 'fa-users', disabled: false })
+      }
+
+      return items
+    },
     sidebarOpen() {
       return useUIStore().sidebarOpen
     },
@@ -125,6 +135,9 @@ export default {
         return true
       }
       if (route === '/kanban-board' && this.$route.path.startsWith('/kanban-board')) {
+        return true
+      }
+      if (route === '/users' && this.$route.path.startsWith('/users')) {
         return true
       }
 

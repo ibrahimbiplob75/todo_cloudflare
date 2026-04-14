@@ -30,6 +30,10 @@
         <i class="fas fa-calendar-alt mr-1"></i>
         {{ meetingName }}
       </p>
+      <p v-if="task.assigneeName">
+        <i class="fas fa-user mr-1"></i>
+        {{ task.assigneeName }}
+      </p>
     </div>
 
     <div class="flex justify-between items-center mt-2 text-xs">

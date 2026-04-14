@@ -2,6 +2,8 @@
  * User Service - Handles all user-related database operations
  */
 
+const VALID_ROLES = ['user', 'watcher'];
+
 /**
  * List all users
  * @param {PrismaClient} prisma - Prisma client instance
@@ -15,6 +17,7 @@ export async function listUsers(prisma) {
 				id: true,
 				name: true,
 				email: true,
+				role: true,
 				createdAt: true,
 				updatedAt: true,
 			},
@@ -45,6 +48,7 @@ export async function getUserById(prisma, id) {
 				id: true,
 				name: true,
 				email: true,
+				role: true,
 				createdAt: true,
 				updatedAt: true,
 			},
@@ -69,7 +73,7 @@ export async function getUserById(prisma, id) {
  */
 export async function createUser(prisma, userData) {
 	try {
-		const { name, email, password } = userData;
+		const { name, email, password, role = 'user' } = userData;
 
 		// Validation
 		if (!name || !email || !password) {
@@ -77,6 +81,14 @@ export async function createUser(prisma, userData) {
 				success: false, 
 				error: 'Name, email, and password are required',
 				statusCode: 400 
+			};
+		}
+
+		if (!VALID_ROLES.includes(role)) {
+			return {
+				success: false,
+				error: `Role must be one of: ${VALID_ROLES.join(', ')}`,
+				statusCode: 400,
 			};
 		}
 
@@ -98,11 +110,13 @@ export async function createUser(prisma, userData) {
 				name,
 				email,
 				password,
+				role,
 			},
 			select: {
 				id: true,
 				name: true,
 				email: true,
+				role: true,
 				createdAt: true,
 				updatedAt: true,
 			},
@@ -153,6 +167,16 @@ export async function updateUser(prisma, id, userData) {
 		if (userData.name !== undefined) updateData.name = userData.name;
 		if (userData.email !== undefined) updateData.email = userData.email;
 		if (userData.password !== undefined) updateData.password = userData.password;
+		if (userData.role !== undefined) {
+			if (!VALID_ROLES.includes(userData.role)) {
+				return {
+					success: false,
+					error: `Role must be one of: ${VALID_ROLES.join(', ')}`,
+					statusCode: 400,
+				};
+			}
+			updateData.role = userData.role;
+		}
 
 		// If email is being updated, check if it's already taken
 		if (updateData.email && updateData.email !== existingUser.email) {
@@ -176,6 +200,7 @@ export async function updateUser(prisma, id, userData) {
 				id: true,
 				name: true,
 				email: true,
+				role: true,
 				createdAt: true,
 				updatedAt: true,
 			},

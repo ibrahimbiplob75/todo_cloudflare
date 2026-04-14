@@ -10,6 +10,7 @@
       </div>
 
       <button
+        v-if="isWatcher"
         @click="showMeetingFormModal = true"
         class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
       >
@@ -42,6 +43,7 @@
           v-for="meeting in meetings"
           :key="meeting.id"
           :meeting="meeting"
+          :can-manage="isWatcher"
           @delete="handleDeleteMeeting"
         />
       </div>
@@ -56,7 +58,7 @@
 
     <!-- Meeting Form Modal -->
     <div
-      v-if="showMeetingFormModal"
+      v-if="showMeetingFormModal && isWatcher"
       class="fixed inset-0 bg-[rgba(0,0,0,0.5)] z-50 flex items-center justify-center p-4"
       @click.self="showMeetingFormModal = false"
     >
@@ -87,6 +89,7 @@
 
 <script>
 import { useMeetingStore } from '@stores/meeting'
+import { useAuthStore } from '@stores/auth'
 import MeetingCard from '@components/meeting/MeetingCard.vue'
 import MeetingForm from '@components/meeting/MeetingForm.vue'
 
@@ -104,6 +107,12 @@ export default {
   computed: {
     meetingStore() {
       return useMeetingStore()
+    },
+    authStore() {
+      return useAuthStore()
+    },
+    isWatcher() {
+      return this.authStore.isWatcher
     },
     meetings() {
       return this.meetingStore.meetings

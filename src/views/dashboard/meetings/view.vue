@@ -4,6 +4,7 @@
       <h1 class="text-3xl font-bold text-gray-800">Meeting Details</h1>
       <div class="flex gap-2">
         <router-link
+          v-if="isWatcher"
           :to="{ name: 'meeting-edit', params: { id: meetingId } }"
           class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
         >
@@ -92,6 +93,7 @@
       <!-- Actions -->
       <div class="border-t border-gray-200 pt-4 flex gap-2">
         <button
+          v-if="isWatcher"
           @click="handleDelete"
           class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
         >
@@ -106,6 +108,7 @@
 <script>
 import { useMeetingStore } from '@stores/meeting'
 import { useProjectStore } from '@stores/project'
+import { useAuthStore } from '@stores/auth'
 
 export default {
   name: 'MeetingViewView',
@@ -124,6 +127,12 @@ export default {
     },
     projectStore() {
       return useProjectStore()
+    },
+    authStore() {
+      return useAuthStore()
+    },
+    isWatcher() {
+      return this.authStore.isWatcher
     },
     meeting() {
       return this.meetingStore.currentMeeting || this.meetingStore.getMeetingById(this.meetingId)

@@ -1,5 +1,5 @@
 import * as taskService from '../services/taskService.js';
-import { extractTokenFromRequest, verifyToken } from '../services/authService.js';
+import { getAuthUserFromRequest } from '../services/authService.js';
 
 /**
  * Task Routes Handler
@@ -9,20 +9,36 @@ export async function handleTaskRoutes(request, prisma, corsHeaders, env = {}) {
 	const url = new URL(request.url);
 	const pathname = url.pathname;
 	const method = request.method;
+	let authCache = null;
 
-	// Helper function to get authenticated user ID
-	async function getUserId() {
-		const token = extractTokenFromRequest(request);
-		if (!token) return null;
-		
-		const payload = await verifyToken(token, env);
-		return payload?.userId || null;
+	async function getAuthContext() {
+		if (authCache) return authCache;
+		authCache = await getAuthUserFromRequest(prisma, request, env);
+		return authCache;
+	}
+
+	function isWatcher(auth) {
+		return auth?.success && auth.data?.role === 'watcher';
+	}
+
+	async function requireAuth() {
+		const auth = await getAuthContext();
+		if (!auth.success) {
+			return Response.json(
+				{ error: auth.error },
+				{ status: auth.statusCode || 401, headers: corsHeaders }
+			);
+		}
+		return null;
 	}
 
 	// GET /task/stats - Task progress (total, incomplete)
 	if (pathname === "/task/stats" && method === 'GET') {
 		try {
-			const userId = await getUserId();
+			const denied = await requireAuth();
+			if (denied) return denied;
+			const auth = await getAuthContext();
+			const userId = isWatcher(auth) ? null : auth.data.id;
 			const result = await taskService.getTaskProgressStats(prisma, userId);
 
 			if (result.success) {
@@ -45,7 +61,10 @@ export async function handleTaskRoutes(request, prisma, corsHeaders, env = {}) {
 	// GET /task/analytics - Task counts by status
 	if (pathname === "/task/analytics" && method === 'GET') {
 		try {
-			const userId = await getUserId();
+			const denied = await requireAuth();
+			if (denied) return denied;
+			const auth = await getAuthContext();
+			const userId = isWatcher(auth) ? null : auth.data.id;
 			const result = await taskService.getTaskStatusAnalytics(prisma, userId);
 
 			if (result.success) {
@@ -65,10 +84,47 @@ export async function handleTaskRoutes(request, prisma, corsHeaders, env = {}) {
 		}
 	}
 
+	// GET /task/user-status-summary - Task status summary grouped by user
+	if (pathname === "/task/user-status-summary" && method === 'GET') {
+		try {
+			const denied = await requireAuth();
+			if (denied) return denied;
+
+			const auth = await getAuthContext();
+			const watcher = isWatcher(auth);
+			const searchParams = url.searchParams;
+			const requestedUserId = parseInt(searchParams.get('user_id'), 10);
+
+			const scopedUserId = watcher
+				? (isNaN(requestedUserId) ? null : requestedUserId)
+				: auth.data.id;
+
+			const result = await taskService.getUserTaskStatusSummary(prisma, scopedUserId);
+
+			if (result.success) {
+				return Response.json({ users: result.data }, { headers: corsHeaders });
+			}
+
+			return Response.json(
+				{ error: result.error },
+				{ status: result.statusCode || 500, headers: corsHeaders }
+			);
+		} catch (error) {
+			console.error('Task user status summary error:', error);
+			return Response.json(
+				{ error: 'Failed to fetch user task status summary' },
+				{ status: 500, headers: corsHeaders }
+			);
+		}
+	}
+
 	// GET /task/calendar-years - Unique years for calendar filter
 	if (pathname === "/task/calendar-years" && method === 'GET') {
 		try {
-			const userId = await getUserId();
+			const denied = await requireAuth();
+			if (denied) return denied;
+			const auth = await getAuthContext();
+			const userId = isWatcher(auth) ? null : auth.data.id;
 			const result = await taskService.getCalendarYears(prisma, userId);
 			if (result.success) {
 				return Response.json({ years: result.data }, { headers: corsHeaders });
@@ -89,7 +145,10 @@ export async function handleTaskRoutes(request, prisma, corsHeaders, env = {}) {
 	// GET /task/calendar?year=&month= - Completed task count per day
 	if (pathname === "/task/calendar" && method === 'GET') {
 		try {
-			const userId = await getUserId();
+			const denied = await requireAuth();
+			if (denied) return denied;
+			const auth = await getAuthContext();
+			const userId = isWatcher(auth) ? null : auth.data.id;
 			const searchParams = url.searchParams;
 			const year = parseInt(searchParams.get('year'), 10) || new Date().getFullYear();
 			const month = parseInt(searchParams.get('month'), 10) || new Date().getMonth() + 1;
@@ -113,12 +172,14 @@ export async function handleTaskRoutes(request, prisma, corsHeaders, env = {}) {
 	// GET /kanban-tasks - Tasks grouped by status for Kanban board
 	if (pathname === "/kanban-tasks" && method === 'GET') {
 		try {
-			const userId = await getUserId();
+			const denied = await requireAuth();
+			if (denied) return denied;
+			const auth = await getAuthContext();
 			const params = url.searchParams;
 			const filters = {
 				project_id: params.get('project_id') || null,
 				meeting_id: params.get('meeting_id') || null,
-				assignedTo: userId,
+				assignedTo: isWatcher(auth) ? null : auth.data.id,
 			};
 			const result = await taskService.getKanbanTasks(prisma, filters);
 			if (result.success) {
@@ -140,13 +201,10 @@ export async function handleTaskRoutes(request, prisma, corsHeaders, env = {}) {
 	// PATCH /kanban-update-task - Update task serial/taskStatus for Kanban drag-drop
 	if (pathname === "/kanban-update-task" && method === 'PATCH') {
 		try {
-			const userId = await getUserId();
-			if (!userId) {
-				return Response.json(
-					{ error: 'Authentication required' },
-					{ status: 401, headers: corsHeaders }
-				);
-			}
+			const denied = await requireAuth();
+			if (denied) return denied;
+			const auth = await getAuthContext();
+			const userId = auth.data.id;
 			const body = await request.json();
 			const { task_id, serial, task_status } = body;
 			if (!task_id) {
@@ -155,6 +213,25 @@ export async function handleTaskRoutes(request, prisma, corsHeaders, env = {}) {
 					{ status: 400, headers: corsHeaders }
 				);
 			}
+
+			const existingTask = await prisma.task.findUnique({
+				where: { id: parseInt(task_id, 10) },
+				select: { id: true, assignedTo: true },
+			});
+			if (!existingTask) {
+				return Response.json(
+					{ error: 'Task not found' },
+					{ status: 404, headers: corsHeaders }
+				);
+			}
+
+			if (!isWatcher(auth) && existingTask.assignedTo && existingTask.assignedTo !== userId) {
+				return Response.json(
+					{ error: 'Unauthorized: You can only update tasks assigned to you' },
+					{ status: 403, headers: corsHeaders }
+				);
+			}
+
 			const payload = {};
 			if (serial != null) payload.serial = serial;
 			if (task_status != null) payload.taskStatus = task_status;
@@ -178,7 +255,11 @@ export async function handleTaskRoutes(request, prisma, corsHeaders, env = {}) {
 	// GET /task - List all tasks (with optional filters)
 	if (pathname === "/task" && method === 'GET') {
 		try {
-			const userId = await getUserId();
+			const denied = await requireAuth();
+			if (denied) return denied;
+			const auth = await getAuthContext();
+			const userId = auth.data.id;
+			const watcher = isWatcher(auth);
 			const searchParams = url.searchParams;
 			
 			// Build filters from query parameters
@@ -192,9 +273,16 @@ export async function handleTaskRoutes(request, prisma, corsHeaders, env = {}) {
 			}
 			
 			if (searchParams.has('assigned_to')) {
-				filters.assignedTo = parseInt(searchParams.get('assigned_to'));
-			} else if (userId) {
-				// If authenticated, default to user's tasks if no filter specified
+				const requestedAssignedTo = parseInt(searchParams.get('assigned_to'), 10);
+				if (watcher) {
+					if (!isNaN(requestedAssignedTo)) {
+						filters.assignedTo = requestedAssignedTo;
+					}
+				} else {
+					filters.assignedTo = userId;
+				}
+			} else if (userId && !watcher) {
+				// For normal users always scope to own tasks
 				filters.assignedTo = userId;
 			}
 			
@@ -298,13 +386,10 @@ export async function handleTaskRoutes(request, prisma, corsHeaders, env = {}) {
 	// POST /task/fast-create - Fast create task (only project_id and title)
 	if (pathname === "/task/fast-create" && method === 'POST') {
 		try {
-			const userId = await getUserId();
-			if (!userId) {
-				return Response.json(
-					{ error: 'Authentication required' },
-					{ status: 401, headers: corsHeaders }
-				);
-			}
+			const denied = await requireAuth();
+			if (denied) return denied;
+			const auth = await getAuthContext();
+			const userId = auth.data.id;
 
 			const body = await request.json();
 			const { projectId, projectMeetingId, title } = body;
@@ -349,13 +434,10 @@ export async function handleTaskRoutes(request, prisma, corsHeaders, env = {}) {
 	// POST /task/set-target-date - Set task target date (Add to Todo)
 	if (pathname === "/task/set-target-date" && method === 'POST') {
 		try {
-			const userId = await getUserId();
-			if (!userId) {
-				return Response.json(
-					{ error: 'Authentication required' },
-					{ status: 401, headers: corsHeaders }
-				);
-			}
+			const denied = await requireAuth();
+			if (denied) return denied;
+			const auth = await getAuthContext();
+			const userId = auth.data.id;
 			const body = await request.json().catch(() => ({}));
 			const { task_id, target_date } = body;
 			if (!task_id) {
@@ -364,6 +446,24 @@ export async function handleTaskRoutes(request, prisma, corsHeaders, env = {}) {
 					{ status: 400, headers: corsHeaders }
 				);
 			}
+
+			const task = await prisma.task.findUnique({
+				where: { id: parseInt(task_id, 10) },
+				select: { id: true, assignedTo: true },
+			});
+			if (!task) {
+				return Response.json(
+					{ error: 'Task not found' },
+					{ status: 404, headers: corsHeaders }
+				);
+			}
+			if (!isWatcher(auth) && task.assignedTo && task.assignedTo !== userId) {
+				return Response.json(
+					{ error: 'Unauthorized: You can only update tasks assigned to you' },
+					{ status: 403, headers: corsHeaders }
+				);
+			}
+
 			const result = await taskService.setTargetDate(prisma, task_id, target_date ?? null);
 			if (result.success) {
 				return Response.json({ task: result.data }, { headers: corsHeaders });
@@ -384,19 +484,15 @@ export async function handleTaskRoutes(request, prisma, corsHeaders, env = {}) {
 	// POST /task/create - Create new task
 	if (pathname === "/task/create" && method === 'POST') {
 		try {
-			const userId = await getUserId();
-			if (!userId) {
-				return Response.json(
-					{ error: 'Authentication required' },
-					{ status: 401, headers: corsHeaders }
-				);
-			}
+			const denied = await requireAuth();
+			if (denied) return denied;
+			const auth = await getAuthContext();
+			const userId = auth.data.id;
 
 			const body = await request.json();
 			
-			// Set created_by implicitly (can be added to schema later)
-			// For now, use assignedTo if not provided
-			if (!body.assignedTo) {
+			// Watcher can assign tasks to others; normal users are always assigned to themselves
+			if (!isWatcher(auth) || !body.assignedTo) {
 				body.assignedTo = userId;
 			}
 			
@@ -424,8 +520,21 @@ export async function handleTaskRoutes(request, prisma, corsHeaders, env = {}) {
 	// GET /task/{id} - Get single task
 	const getTaskMatch = pathname.match(/^\/task\/(\d+)$/);
 	if (getTaskMatch && method === 'GET') {
+		const denied = await requireAuth();
+		if (denied) return denied;
+		const auth = await getAuthContext();
+		const userId = auth.data.id;
 		const taskId = getTaskMatch[1];
 		const result = await taskService.getTaskById(prisma, taskId);
+
+		if (result.success && !isWatcher(auth)) {
+			if (result.data.assignedTo && result.data.assignedTo !== userId) {
+				return Response.json(
+					{ error: 'Unauthorized: You can only view tasks assigned to you' },
+					{ status: 403, headers: corsHeaders }
+				);
+			}
+		}
 		
 		if (result.success) {
 			return Response.json({ task: result.data }, { headers: corsHeaders });
@@ -441,7 +550,25 @@ export async function handleTaskRoutes(request, prisma, corsHeaders, env = {}) {
 	const getSubtasksMatch = pathname.match(/^\/task\/(\d+)\/subtasks$/);
 	if (getSubtasksMatch && method === 'GET') {
 		try {
+			const denied = await requireAuth();
+			if (denied) return denied;
+			const auth = await getAuthContext();
+			const userId = auth.data.id;
 			const taskId = getSubtasksMatch[1];
+
+			if (!isWatcher(auth)) {
+				const parentTask = await prisma.task.findUnique({
+					where: { id: parseInt(taskId, 10) },
+					select: { assignedTo: true },
+				});
+				if (parentTask?.assignedTo && parentTask.assignedTo !== userId) {
+					return Response.json(
+						{ error: 'Unauthorized: You can only view subtasks for your own tasks' },
+						{ status: 403, headers: corsHeaders }
+					);
+				}
+			}
+
 			const result = await taskService.getSubtasks(prisma, taskId);
 			
 			if (result.success) {
@@ -465,13 +592,10 @@ export async function handleTaskRoutes(request, prisma, corsHeaders, env = {}) {
 	const updateTaskMatch = pathname.match(/^\/task\/(\d+)\/update$/);
 	if (updateTaskMatch && method === 'POST') {
 		try {
-			const userId = await getUserId();
-			if (!userId) {
-				return Response.json(
-					{ error: 'Authentication required' },
-					{ status: 401, headers: corsHeaders }
-				);
-			}
+			const denied = await requireAuth();
+			if (denied) return denied;
+			const auth = await getAuthContext();
+			const userId = auth.data.id;
 
 			const taskId = updateTaskMatch[1];
 			const body = await request.json();
@@ -490,9 +614,16 @@ export async function handleTaskRoutes(request, prisma, corsHeaders, env = {}) {
 
 			// Allow update if user is assigned to the task
 			// You can add stricter ownership checks if needed
-			if (existingTask.assignedTo && existingTask.assignedTo !== userId) {
+			if (!isWatcher(auth) && existingTask.assignedTo && existingTask.assignedTo !== userId) {
 				return Response.json(
 					{ error: 'Unauthorized: You can only update tasks assigned to you' },
+					{ status: 403, headers: corsHeaders }
+				);
+			}
+
+			if (!isWatcher(auth) && body.assignedTo !== undefined && body.assignedTo !== userId) {
+				return Response.json(
+					{ error: 'Unauthorized: Only watcher can reassign tasks' },
 					{ status: 403, headers: corsHeaders }
 				);
 			}
@@ -522,13 +653,10 @@ export async function handleTaskRoutes(request, prisma, corsHeaders, env = {}) {
 	const deleteTaskMatch = pathname.match(/^\/task\/(\d+)\/delete$/);
 	if (deleteTaskMatch && method === 'POST') {
 		try {
-			const userId = await getUserId();
-			if (!userId) {
-				return Response.json(
-					{ error: 'Authentication required' },
-					{ status: 401, headers: corsHeaders }
-				);
-			}
+			const denied = await requireAuth();
+			if (denied) return denied;
+			const auth = await getAuthContext();
+			const userId = auth.data.id;
 
 			const taskId = deleteTaskMatch[1];
 			
@@ -544,7 +672,7 @@ export async function handleTaskRoutes(request, prisma, corsHeaders, env = {}) {
 				);
 			}
 
-			if (existingTask.assignedTo && existingTask.assignedTo !== userId) {
+			if (!isWatcher(auth) && existingTask.assignedTo && existingTask.assignedTo !== userId) {
 				return Response.json(
 					{ error: 'Unauthorized: You can only delete tasks assigned to you' },
 					{ status: 403, headers: corsHeaders }

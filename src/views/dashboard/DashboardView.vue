@@ -25,12 +25,17 @@
         <TaskCompletionChart />
       </div>
 
+      <div class="mt-6">
+        <UserTaskStatusSummary />
+      </div>
+
     </div>
   </div>
 </template>
 
 <script>
 import { useAuthStore } from '@stores/auth'
+import UserTaskStatusSummary from '@components/task/UserTaskStatusSummary.vue'
 import TaskProgress from '@components/task/TaskProgress.vue'
 import TaskStatusAnalytics from '@components/task/TaskStatusAnalytics.vue'
 import ProjectAnalytics from '@components/project/ProjectAnalytics.vue'
@@ -38,9 +43,10 @@ import MeetingAnalytics from '@components/meeting/MeetingAnalytics.vue'
 import CalendarAnalytics from '@components/task/CalendarAnalytics.vue'
 import TaskCompletionChart from '@components/task/TaskCompletionChart.vue'
 
+
 export default {
   name: 'DashboardView',
-  components: { TaskProgress, TaskStatusAnalytics, ProjectAnalytics, MeetingAnalytics, CalendarAnalytics, TaskCompletionChart },
+  components: { TaskProgress, TaskStatusAnalytics, ProjectAnalytics, MeetingAnalytics,UserTaskStatusSummary, CalendarAnalytics, TaskCompletionChart },
   computed: {
     userName() {
       return useAuthStore().userName

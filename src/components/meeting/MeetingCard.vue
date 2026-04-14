@@ -55,6 +55,7 @@
           <i class="fas fa-tasks"></i>
         </router-link>
         <button
+          v-if="canManage"
           @click.stop="editMeeting"
           class="px-3 py-1 bg-gray-50 text-gray-600 rounded text-sm hover:bg-gray-100 transition-colors"
           title="Edit meeting"
@@ -62,6 +63,7 @@
           <i class="fas fa-edit"></i>
         </button>
         <button
+          v-if="canManage"
           @click.stop="deleteMeeting"
           class="px-3 py-1 bg-red-50 text-red-600 rounded text-sm hover:bg-red-100 transition-colors"
           title="Delete meeting"
@@ -82,6 +84,10 @@ export default {
     meeting: {
       type: Object,
       required: true,
+    },
+    canManage: {
+      type: Boolean,
+      default: false,
     },
   },
   computed: {

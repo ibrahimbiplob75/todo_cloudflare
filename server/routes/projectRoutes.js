@@ -1,6 +1,6 @@
 import * as projectService from '../services/projectService.js';
 import * as taskService from '../services/taskService.js';
-import { extractTokenFromRequest, verifyToken } from '../services/authService.js';
+import { getAuthUserFromRequest } from '../services/authService.js';
 
 /**
  * Project Routes Handler
@@ -10,20 +10,49 @@ export async function handleProjectRoutes(request, prisma, corsHeaders, env = {}
 	const url = new URL(request.url);
 	const pathname = url.pathname;
 	const method = request.method;
+	let authCache = null;
 
-	// Helper function to get authenticated user ID
-	async function getUserId() {
-		const token = extractTokenFromRequest(request);
-		if (!token) return null;
-		
-		const payload = await verifyToken(token, env);
-		return payload?.userId || null;
+	async function getAuthContext() {
+		if (authCache) return authCache;
+		authCache = await getAuthUserFromRequest(prisma, request, env);
+		return authCache;
+	}
+
+	function isWatcher(auth) {
+		return auth?.success && auth.data?.role === 'watcher';
+	}
+
+	async function requireAuth() {
+		const auth = await getAuthContext();
+		if (!auth.success) {
+			return Response.json(
+				{ error: auth.error },
+				{ status: auth.statusCode || 401, headers: corsHeaders }
+			);
+		}
+		return null;
+	}
+
+	async function requireWatcher() {
+		const denied = await requireAuth();
+		if (denied) return denied;
+		const auth = await getAuthContext();
+		if (!isWatcher(auth)) {
+			return Response.json(
+				{ error: 'Forbidden: watcher role required' },
+				{ status: 403, headers: corsHeaders }
+			);
+		}
+		return null;
 	}
 
 	// GET /project/analytics - Project task counts (incomplete/total) for active tasks
 	if (pathname === "/project/analytics" && method === 'GET') {
 		try {
-			const userId = await getUserId();
+			const denied = await requireAuth();
+			if (denied) return denied;
+			const auth = await getAuthContext();
+			const userId = isWatcher(auth) ? null : auth.data.id;
 			const result = await projectService.getProjectAnalytics(prisma, userId);
 
 			if (result.success) {
@@ -46,9 +75,9 @@ export async function handleProjectRoutes(request, prisma, corsHeaders, env = {}
 	// GET /project - List all projects (optional: filter by creator)
 	if (pathname === "/project" && method === 'GET') {
 		try {
-			const userId = await getUserId();
-			// If authenticated, filter by user's projects. Otherwise show all.
-			const result = await projectService.listProjects(prisma, userId);
+			const denied = await requireAuth();
+			if (denied) return denied;
+			const result = await projectService.listProjects(prisma, null);
 			
 			if (result.success) {
 				return Response.json({ projects: result.data }, { headers: corsHeaders });
@@ -70,18 +99,14 @@ export async function handleProjectRoutes(request, prisma, corsHeaders, env = {}
 	// POST /project/create - Create new project
 	if (pathname === "/project/create" && method === 'POST') {
 		try {
-			const userId = await getUserId();
-			if (!userId) {
-				return Response.json(
-					{ error: 'Authentication required' },
-					{ status: 401, headers: corsHeaders }
-				);
-			}
+			const denied = await requireWatcher();
+			if (denied) return denied;
+			const auth = await getAuthContext();
 
 			const body = await request.json();
 			const result = await projectService.createProject(prisma, {
 				...body,
-				creator: userId, // Set creator from authenticated user
+				creator: auth.data.id, // Set creator from authenticated watcher
 			});
 			
 			if (result.success) {
@@ -107,6 +132,9 @@ export async function handleProjectRoutes(request, prisma, corsHeaders, env = {}
 	const projectTasksMatch = pathname.match(/^\/project\/(\d+)\/tasks$/);
 	if (projectTasksMatch && method === 'GET') {
 		try {
+			const denied = await requireAuth();
+			if (denied) return denied;
+			const auth = await getAuthContext();
 			const projectId = projectTasksMatch[1];
 			const params = url.searchParams;
 			const taskStatusParam = params.get('task_status');
@@ -117,6 +145,7 @@ export async function handleProjectRoutes(request, prisma, corsHeaders, env = {}
 			const filters = {
 				task_status: taskStatus.length > 0 ? taskStatus : undefined,
 				project_meeting_id: projectMeetingId || null,
+				assigned_to: isWatcher(auth) ? null : auth.data.id,
 				date_type: params.get('date_type') || 'submission_date',
 				sort_by: params.get('sort_by') || 'date_type',
 				sort_order: params.get('sort_order') || 'asc',
@@ -143,6 +172,8 @@ export async function handleProjectRoutes(request, prisma, corsHeaders, env = {}
 	// GET /project/{id} - Get single project
 	const getProjectMatch = pathname.match(/^\/project\/(\d+)$/);
 	if (getProjectMatch && method === 'GET') {
+		const denied = await requireAuth();
+		if (denied) return denied;
 		const projectId = getProjectMatch[1];
 		const result = await projectService.getProjectById(prisma, projectId);
 		
@@ -160,13 +191,8 @@ export async function handleProjectRoutes(request, prisma, corsHeaders, env = {}
 	const updateProjectMatch = pathname.match(/^\/project\/(\d+)\/update$/);
 	if (updateProjectMatch && method === 'POST') {
 		try {
-			const userId = await getUserId();
-			if (!userId) {
-				return Response.json(
-					{ error: 'Authentication required' },
-					{ status: 401, headers: corsHeaders }
-				);
-			}
+			const denied = await requireWatcher();
+			if (denied) return denied;
 
 			const projectId = updateProjectMatch[1];
 			const body = await request.json();
@@ -180,13 +206,6 @@ export async function handleProjectRoutes(request, prisma, corsHeaders, env = {}
 				return Response.json(
 					{ error: 'Project not found' },
 					{ status: 404, headers: corsHeaders }
-				);
-			}
-
-			if (existingProject.creator !== userId) {
-				return Response.json(
-					{ error: 'Unauthorized: You can only update your own projects' },
-					{ status: 403, headers: corsHeaders }
 				);
 			}
 
@@ -215,13 +234,8 @@ export async function handleProjectRoutes(request, prisma, corsHeaders, env = {}
 	const deleteProjectMatch = pathname.match(/^\/project\/(\d+)\/delete$/);
 	if (deleteProjectMatch && method === 'POST') {
 		try {
-			const userId = await getUserId();
-			if (!userId) {
-				return Response.json(
-					{ error: 'Authentication required' },
-					{ status: 401, headers: corsHeaders }
-				);
-			}
+			const denied = await requireWatcher();
+			if (denied) return denied;
 
 			const projectId = deleteProjectMatch[1];
 			
@@ -234,13 +248,6 @@ export async function handleProjectRoutes(request, prisma, corsHeaders, env = {}
 				return Response.json(
 					{ error: 'Project not found' },
 					{ status: 404, headers: corsHeaders }
-				);
-			}
-
-			if (existingProject.creator !== userId) {
-				return Response.json(
-					{ error: 'Unauthorized: You can only delete your own projects' },
-					{ status: 403, headers: corsHeaders }
 				);
 			}
 

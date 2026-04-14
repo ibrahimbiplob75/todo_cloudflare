@@ -3,6 +3,7 @@
     <div class="flex justify-between items-center mb-6">
       <h1 class="text-3xl font-bold text-gray-800">Projects</h1>
       <router-link
+        v-if="isWatcher"
         to="/projects/create"
         class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
       >
@@ -64,12 +65,14 @@
               <i class="fas fa-print"></i>
             </router-link>
             <button
+              v-if="isWatcher"
               @click.stop="editProject(project.id)"
               class="px-3 py-1 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors"
             >
               <i class="fas fa-edit"></i>
             </button>
             <button
+              v-if="isWatcher"
               @click.stop="confirmDelete(project)"
               class="px-3 py-1 bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors"
             >
@@ -85,6 +88,7 @@
       <i class="fas fa-folder-open text-6xl text-gray-300 mb-4"></i>
       <p class="text-gray-500 text-lg mb-4">No projects found</p>
       <router-link
+        v-if="isWatcher"
         to="/projects/create"
         class="inline-block px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
       >
@@ -97,6 +101,7 @@
 
 <script>
 import { useProjectStore } from '@stores/project'
+import { useAuthStore } from '@stores/auth'
 
 export default {
   name: 'ProjectsAllView',
@@ -109,6 +114,12 @@ export default {
   computed: {
     projectStore() {
       return useProjectStore()
+    },
+    authStore() {
+      return useAuthStore()
+    },
+    isWatcher() {
+      return this.authStore.isWatcher
     },
     projects() {
       return this.projectStore.projects

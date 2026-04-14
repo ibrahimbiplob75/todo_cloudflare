@@ -1,5 +1,5 @@
 import * as meetingService from '../services/meetingService.js';
-import { extractTokenFromRequest, verifyToken } from '../services/authService.js';
+import { getAuthUserFromRequest } from '../services/authService.js';
 
 /**
  * Meeting Routes Handler
@@ -9,20 +9,49 @@ export async function handleMeetingRoutes(request, prisma, corsHeaders, env = {}
 	const url = new URL(request.url);
 	const pathname = url.pathname;
 	const method = request.method;
+	let authCache = null;
 
-	// Helper function to get authenticated user ID
-	async function getUserId() {
-		const token = extractTokenFromRequest(request);
-		if (!token) return null;
-		
-		const payload = await verifyToken(token, env);
-		return payload?.userId || null;
+	async function getAuthContext() {
+		if (authCache) return authCache;
+		authCache = await getAuthUserFromRequest(prisma, request, env);
+		return authCache;
+	}
+
+	function isWatcher(auth) {
+		return auth?.success && auth.data?.role === 'watcher';
+	}
+
+	async function requireAuth() {
+		const auth = await getAuthContext();
+		if (!auth.success) {
+			return Response.json(
+				{ error: auth.error },
+				{ status: auth.statusCode || 401, headers: corsHeaders }
+			);
+		}
+		return null;
+	}
+
+	async function requireWatcher() {
+		const denied = await requireAuth();
+		if (denied) return denied;
+		const auth = await getAuthContext();
+		if (!isWatcher(auth)) {
+			return Response.json(
+				{ error: 'Forbidden: watcher role required' },
+				{ status: 403, headers: corsHeaders }
+			);
+		}
+		return null;
 	}
 
 	// GET /meeting/analytics - Meeting task counts (completed/total) for active tasks
 	if (pathname === "/meeting/analytics" && method === 'GET') {
 		try {
-			const userId = await getUserId();
+			const denied = await requireAuth();
+			if (denied) return denied;
+			const auth = await getAuthContext();
+			const userId = isWatcher(auth) ? null : auth.data.id;
 			const result = await meetingService.getMeetingAnalytics(prisma, userId);
 
 			if (result.success) {
@@ -45,7 +74,9 @@ export async function handleMeetingRoutes(request, prisma, corsHeaders, env = {}
 	// GET /meeting - List all meetings (with optional filters)
 	if (pathname === "/meeting" && method === 'GET') {
 		try {
-			const userId = await getUserId();
+			const denied = await requireAuth();
+			if (denied) return denied;
+			const auth = await getAuthContext();
 			const searchParams = url.searchParams;
 			
 			// Build filters from query parameters
@@ -56,11 +87,10 @@ export async function handleMeetingRoutes(request, prisma, corsHeaders, env = {}
 			}
 
 			if (searchParams.has('creator')) {
-				filters.creator = parseInt(searchParams.get('creator'));
-			} else if (userId && !filters.projectId) {
-				// When project_id is specified, return all meetings for the project.
-				// Otherwise default to user's meetings.
-				filters.creator = userId;
+				const creatorId = parseInt(searchParams.get('creator'), 10);
+				if (isWatcher(auth) && !isNaN(creatorId)) {
+					filters.creator = creatorId;
+				}
 			}
 			
 			const result = await meetingService.listMeetings(prisma, filters);
@@ -85,19 +115,15 @@ export async function handleMeetingRoutes(request, prisma, corsHeaders, env = {}
 	// POST /meeting/create - Create new meeting
 	if (pathname === "/meeting/create" && method === 'POST') {
 		try {
-			const userId = await getUserId();
-			if (!userId) {
-				return Response.json(
-					{ error: 'Authentication required' },
-					{ status: 401, headers: corsHeaders }
-				);
-			}
+			const denied = await requireWatcher();
+			if (denied) return denied;
+			const auth = await getAuthContext();
 
 			const body = await request.json();
 			
 			// Set creator to authenticated user if not provided
 			if (!body.creator) {
-				body.creator = userId;
+				body.creator = auth.data.id;
 			}
 			
 			const result = await meetingService.createMeeting(prisma, body);
@@ -124,6 +150,8 @@ export async function handleMeetingRoutes(request, prisma, corsHeaders, env = {}
 	// GET /meeting/{id} - Get single meeting
 	const getMeetingMatch = pathname.match(/^\/meeting\/(\d+)$/);
 	if (getMeetingMatch && method === 'GET') {
+		const denied = await requireAuth();
+		if (denied) return denied;
 		const meetingId = getMeetingMatch[1];
 		const result = await meetingService.getMeetingById(prisma, meetingId);
 		
@@ -141,6 +169,8 @@ export async function handleMeetingRoutes(request, prisma, corsHeaders, env = {}
 	const getMeetingBySlugMatch = pathname.match(/^\/meeting\/slug\/(.+)$/);
 	if (getMeetingBySlugMatch && method === 'GET') {
 		try {
+			const denied = await requireAuth();
+			if (denied) return denied;
 			const slug = decodeURIComponent(getMeetingBySlugMatch[1]);
 			const result = await meetingService.getMeetingBySlug(prisma, slug);
 			
@@ -165,13 +195,8 @@ export async function handleMeetingRoutes(request, prisma, corsHeaders, env = {}
 	const updateMeetingMatch = pathname.match(/^\/meeting\/(\d+)\/update$/);
 	if (updateMeetingMatch && method === 'POST') {
 		try {
-			const userId = await getUserId();
-			if (!userId) {
-				return Response.json(
-					{ error: 'Authentication required' },
-					{ status: 401, headers: corsHeaders }
-				);
-			}
+			const denied = await requireWatcher();
+			if (denied) return denied;
 
 			const meetingId = updateMeetingMatch[1];
 			
@@ -181,14 +206,6 @@ export async function handleMeetingRoutes(request, prisma, corsHeaders, env = {}
 				return Response.json(
 					{ error: existingMeeting.error },
 					{ status: existingMeeting.statusCode || 404, headers: corsHeaders }
-				);
-			}
-
-			// Authorization: Only creator can update
-			if (existingMeeting.data.creator !== userId) {
-				return Response.json(
-					{ error: 'You can only update meetings you created' },
-					{ status: 403, headers: corsHeaders }
 				);
 			}
 
@@ -218,13 +235,8 @@ export async function handleMeetingRoutes(request, prisma, corsHeaders, env = {}
 	const deleteMeetingMatch = pathname.match(/^\/meeting\/(\d+)\/delete$/);
 	if (deleteMeetingMatch && method === 'POST') {
 		try {
-			const userId = await getUserId();
-			if (!userId) {
-				return Response.json(
-					{ error: 'Authentication required' },
-					{ status: 401, headers: corsHeaders }
-				);
-			}
+			const denied = await requireWatcher();
+			if (denied) return denied;
 
 			const meetingId = deleteMeetingMatch[1];
 			
@@ -234,14 +246,6 @@ export async function handleMeetingRoutes(request, prisma, corsHeaders, env = {}
 				return Response.json(
 					{ error: existingMeeting.error },
 					{ status: existingMeeting.statusCode || 404, headers: corsHeaders }
-				);
-			}
-
-			// Authorization: Only creator can delete
-			if (existingMeeting.data.creator !== userId) {
-				return Response.json(
-					{ error: 'You can only delete meetings you created' },
-					{ status: 403, headers: corsHeaders }
 				);
 			}
 

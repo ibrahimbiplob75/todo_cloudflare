@@ -179,6 +179,23 @@
       </div>
     </div>
 
+    <div v-if="isWatcher">
+      <label for="assignedTo" class="block text-sm font-medium text-gray-700 mb-1">
+        Assign To
+      </label>
+      <select
+        id="assignedTo"
+        v-model="formData.assignedTo"
+        :disabled="loadingUsers"
+        class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none disabled:bg-gray-100 disabled:cursor-wait"
+      >
+        <option :value="null">{{ loadingUsers ? 'Loading users...' : 'Unassigned' }}</option>
+        <option v-for="user in users" :key="user.id" :value="user.id">
+          {{ user.name }} ({{ user.email }})
+        </option>
+      </select>
+    </div>
+
     <div class="grid grid-cols-2 gap-4">
       <div>
         <label for="submissionDate" class="block text-sm font-medium text-gray-700 mb-1">
@@ -276,6 +293,7 @@
 import { useProjectStore } from '@stores/project'
 import { useTaskStore } from '@stores/task'
 import { useMeetingStore } from '@stores/meeting'
+import { useAuthStore } from '@stores/auth'
 
 export default {
   name: 'TaskForm',
@@ -322,6 +340,7 @@ export default {
         completionDate: '',
         targetDate: '',
         comment: '',
+        assignedTo: null,
       },
       taskItems: [],
       taskItemNextId: 0,
@@ -329,9 +348,14 @@ export default {
       parentTask: null,
       projectMeetings: [],
       loadingMeetings: false,
+      users: [],
+      loadingUsers: false,
     }
   },
   computed: {
+    authStore() {
+      return useAuthStore()
+    },
     projectStore() {
       return useProjectStore()
     },
@@ -349,6 +373,12 @@ export default {
     },
     isCreateMode() {
       return !this.task
+    },
+    isWatcher() {
+      return this.authStore.isWatcher
+    },
+    currentUserId() {
+      return this.authStore.user?.id || null
     },
   },
   watch: {
@@ -388,6 +418,7 @@ export default {
             completionDate: this.formatDateTimeLocal(newTask.completionDate),
             targetDate: this.formatDateTimeLocal(newTask.targetDate),
             comment: newTask.comment || '',
+            assignedTo: newTask.assignedTo || null,
           }
           this.taskItems = []
           if (this.formData.projectId) {
@@ -411,6 +442,7 @@ export default {
             completionDate: '',
             targetDate: '',
             comment: '',
+            assignedTo: this.isWatcher ? this.currentUserId : null,
           }
           this.taskItems = [this.newTaskItem()]
           if (inheritedProjectId) {
@@ -442,8 +474,30 @@ export default {
     if (this.parentTaskId && !this.parentTask) {
       await this.fetchParentTask()
     }
+
+    if (this.isWatcher) {
+      await this.fetchUsers()
+    }
   },
   methods: {
+    async fetchUsers() {
+      this.loadingUsers = true
+      try {
+        const token = localStorage.getItem('auth_token')
+        const response = await fetch('/user', {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        })
+        const data = await response.json().catch(() => ({}))
+        this.users = response.ok ? (data.users || []) : []
+      } catch {
+        this.users = []
+      } finally {
+        this.loadingUsers = false
+      }
+    },
+
     async fetchParentTask() {
       if (!this.parentTaskId) return
       
@@ -553,6 +607,7 @@ export default {
         projectId,
         projectMeetingId: this.formData.projectMeetingId || null,
         parentTaskId: this.formData.parentTaskId ?? this.parentTaskId ?? null,
+        ...(this.isWatcher ? { assignedTo: this.formData.assignedTo || null } : {}),
         priority: this.formData.priority,
         taskStatus: this.formData.taskStatus,
         progressPercent: this.formData.progressPercent ?? 0,

@@ -451,6 +451,7 @@ export async function listTasks(prisma, filters = {}) {
 					id: true,
 					title: true,
 					taskStatus: true,
+					assignedTo: true,
 					submissionDate: true,
 					targetDate: true, // optional
 					progressPercent: true,
@@ -465,6 +466,7 @@ export async function listTasks(prisma, filters = {}) {
 					id: true,
 					title: true,
 					taskStatus: true,
+					assignedTo: true,
 					submissionDate: true,
 					targetDate: true,
 					progressPercent: true,
@@ -500,8 +502,12 @@ export async function listTasks(prisma, filters = {}) {
 		const meetingIds = [...new Set(tasks.map(t => t.projectMeetingId).filter(Boolean))];
 		const taskIds = tasks.map(t => t.id);
 		const parentTaskIds = [...new Set(tasks.map(t => t.parentTaskId).filter(Boolean))];
+		const assignedUserIds = [...new Set([
+			...tasks.map((t) => t.assignedTo).filter(Boolean),
+			...tasks.flatMap((t) => (t.subtasks || []).map((st) => st.assignedTo)).filter(Boolean),
+		])];
 
-		const [projects, meetings, completedByParent, totalByParent, parentTasks] = await Promise.all([
+		const [projects, meetings, completedByParent, totalByParent, parentTasks, users] = await Promise.all([
 			projectIds.length > 0
 				? prisma.project.findMany({ where: { id: { in: projectIds } }, select: { id: true, title: true } })
 				: [],
@@ -528,6 +534,12 @@ export async function listTasks(prisma, filters = {}) {
 					select: { id: true, title: true },
 				})
 				: [],
+			assignedUserIds.length > 0
+				? prisma.user.findMany({
+					where: { id: { in: assignedUserIds } },
+					select: { id: true, name: true, email: true },
+				})
+				: [],
 		]);
 
 		const completedCountByParent = new Map((completedByParent || []).map(p => [p.parentTaskId, p._count.id]));
@@ -536,6 +548,7 @@ export async function listTasks(prisma, filters = {}) {
 
 		const projectById = new Map((projects || []).map(p => [p.id, p.title]));
 		const meetingById = new Map((meetings || []).map(m => [m.id, m.title]));
+		const userById = new Map((users || []).map((u) => [u.id, u]));
 
 		const tasksWithCounts = tasks.map(task => {
 			const rawSubtasks = task.subtasks || [];
@@ -550,6 +563,8 @@ export async function listTasks(prisma, filters = {}) {
 				id: st.id,
 				title: st.title ?? '',
 				taskStatus: st.taskStatus,
+				assignedTo: st.assignedTo ?? null,
+				assigneeName: st.assignedTo ? (userById.get(st.assignedTo)?.name ?? null) : null,
 				submissionDate: st.submissionDate ?? null,
 				projectName,
 				progressPercent: st.progressPercent ?? 0,
@@ -563,6 +578,7 @@ export async function listTasks(prisma, filters = {}) {
 
 			return {
 				...task,
+				assigneeName: task.assignedTo ? (userById.get(task.assignedTo)?.name ?? null) : null,
 				subtasks,
 				totalSubTasks: totalSubs,
 				completedSubTasks: completedSubtasks,
@@ -595,6 +611,75 @@ export async function listTasks(prisma, filters = {}) {
 }
 
 /**
+ * Get task status summary grouped by user.
+ * @param {PrismaClient} prisma - Prisma client instance
+ * @param {number|null} userId - Optional user filter; when provided, returns one user's summary
+ * @returns {Promise<Object>} { success, data: [{ userId, userName, total, pending, inProgress, completed, failed, hold }] }
+ */
+export async function getUserTaskStatusSummary(prisma, userId = null) {
+	try {
+		const where = { status: 1, parentTaskId: null };
+		if (userId) where.assignedTo = userId;
+
+		const tasks = await prisma.task.findMany({
+			where,
+			select: {
+				assignedTo: true,
+				taskStatus: true,
+			},
+		});
+
+		const assignedIds = [...new Set(tasks.map((t) => t.assignedTo).filter(Boolean))];
+		const userIds = userId
+			? [userId]
+			: assignedIds;
+
+		const users = userIds.length > 0
+			? await prisma.user.findMany({
+				where: { id: { in: userIds } },
+				select: { id: true, name: true, email: true },
+			})
+			: [];
+
+		const statusSeeds = {
+			pending: 0,
+			inProgress: 0,
+			completed: 0,
+			failed: 0,
+			hold: 0,
+		};
+
+		const byUser = new Map();
+		for (const u of users) {
+			byUser.set(u.id, {
+				userId: u.id,
+				userName: u.name,
+				email: u.email,
+				total: 0,
+				...statusSeeds,
+			});
+		}
+
+		for (const t of tasks) {
+			if (!t.assignedTo || !byUser.has(t.assignedTo)) continue;
+			const s = byUser.get(t.assignedTo);
+			s.total += 1;
+			if (t.taskStatus === 'pending') s.pending += 1;
+			if (t.taskStatus === 'in_progress') s.inProgress += 1;
+			if (t.taskStatus === 'completed') s.completed += 1;
+			if (t.taskStatus === 'failed') s.failed += 1;
+			if (t.taskStatus === 'hold') s.hold += 1;
+		}
+
+		const data = [...byUser.values()].sort((a, b) => a.userName.localeCompare(b.userName));
+		return { success: true, data };
+	} catch (error) {
+		console.error('Error getting user task status summary:', error);
+		return { success: false, error: error.message };
+	}
+}
+
+/**
  * Get project tasks for the project details page.
  * Returns tasks with subtasks, grouped by date (submission or completion) and meeting.
  * @param {PrismaClient} prisma - Prisma client instance
@@ -610,6 +695,13 @@ export async function getProjectTasks(prisma, projectId, filters = {}) {
 		}
 
 		const where = { status: 1, projectId: pid, parentTaskId: null };
+
+		if (filters.assigned_to != null && filters.assigned_to !== '') {
+			const assignedTo = parseInt(filters.assigned_to, 10);
+			if (!isNaN(assignedTo)) {
+				where.assignedTo = assignedTo;
+			}
+		}
 
 		if (filters.project_meeting_id != null && filters.project_meeting_id !== '') {
 			const mid = parseInt(filters.project_meeting_id, 10);

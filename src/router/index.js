@@ -38,7 +38,7 @@ const router = createRouter({
       path: '/projects/create',
       name: 'project-create',
       component: () => import('@views/dashboard/projects/create.vue'),
-      meta: { middleware: 'private', layout: 'private' },
+      meta: { middleware: 'private', layout: 'private', requiresWatcher: true },
     },
     {
       path: '/projects/:id',
@@ -50,7 +50,7 @@ const router = createRouter({
       path: '/projects/:id/update',
       name: 'project-update',
       component: () => import('@views/dashboard/projects/update.vue'),
-      meta: { middleware: 'private', layout: 'private' },
+      meta: { middleware: 'private', layout: 'private', requiresWatcher: true },
     },
     {
       path: '/project-details/:id',
@@ -113,6 +113,12 @@ const router = createRouter({
       meta: { middleware: 'private', layout: 'private' },
     },
     {
+      path: '/users',
+      name: 'users-list',
+      component: () => import('@views/dashboard/users/index.vue'),
+      meta: { middleware: 'private', layout: 'private', requiresWatcher: true },
+    },
+    {
       path: '/meetings',
       name: 'meetings-list',
       component: () => import('@views/dashboard/meetings/list.vue'),
@@ -128,7 +134,7 @@ const router = createRouter({
       path: '/meetings/:id/edit',
       name: 'meeting-edit',
       component: () => import('@views/dashboard/meetings/edit.vue'),
-      meta: { middleware: 'private', layout: 'private' },
+      meta: { middleware: 'private', layout: 'private', requiresWatcher: true },
     },
     {
       path: '/',
@@ -153,6 +159,11 @@ router.beforeEach(async (to, from, next) => {
 
   // Redirect authenticated users away from login page
   if (to.name === 'login' && authStore.isAuthenticated) {
+    next({ name: 'dashboard' })
+    return
+  }
+
+  if (to.meta.requiresWatcher && !authStore.isWatcher) {
     next({ name: 'dashboard' })
     return
   }

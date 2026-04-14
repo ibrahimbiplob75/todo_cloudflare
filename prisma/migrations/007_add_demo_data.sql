@@ -3,10 +3,11 @@ INSERT INTO "users" (
   "name",
   "email",
   "password",
+  "role",
   "created_at",
   "updated_at"
 ) VALUES
-  ('shefat', 'myphoto288@gmail.com', '11221122', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+  ('shefat', 'myphoto288@gmail.com', '11221122', 'watcher', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
   
 INSERT INTO "projects" (
   "id",

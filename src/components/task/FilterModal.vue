@@ -58,6 +58,20 @@
           </select>
         </div>
 
+        <div v-if="isWatcher">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Assigned User</label>
+          <select
+            v-model="localFilters.assignedTo"
+            :disabled="loadingUsers"
+            class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none disabled:bg-gray-100 disabled:cursor-wait"
+          >
+            <option :value="null">{{ loadingUsers ? 'Loading users...' : 'All Users' }}</option>
+            <option v-for="user in users" :key="user.id" :value="user.id">
+              {{ user.name }} ({{ user.email }})
+            </option>
+          </select>
+        </div>
+
         <div v-if="localFilters.projectId">
           <label class="block text-sm font-medium text-gray-700 mb-2">Meeting</label>
           <select
@@ -138,6 +152,7 @@
 <script>
 import { useProjectStore } from '@stores/project'
 import { useMeetingStore } from '@stores/meeting'
+import { useAuthStore } from '@stores/auth'
 
 export default {
   name: 'FilterModal',
@@ -155,11 +170,14 @@ export default {
   data() {
     return {
       loadingMeetings: false,
+      loadingUsers: false,
       projectMeetings: [],
+      users: [],
       localFilters: {
         taskStatus: null,
         priority: null,
         projectId: null,
+        assignedTo: null,
         projectMeetingId: null,
         submission_date_from: null,
         submission_date_to: null,
@@ -181,6 +199,12 @@ export default {
     }
   },
   computed: {
+    authStore() {
+      return useAuthStore()
+    },
+    isWatcher() {
+      return this.authStore.isWatcher
+    },
     projectStore() {
       return useProjectStore()
     },
@@ -212,8 +236,29 @@ export default {
     if (this.projects.length === 0) {
       await this.projectStore.fetchProjects()
     }
+    if (this.isWatcher) {
+      await this.fetchUsers()
+    }
   },
   methods: {
+    async fetchUsers() {
+      this.loadingUsers = true
+      try {
+        const token = localStorage.getItem('auth_token')
+        const response = await fetch('/user', {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        })
+        const data = await response.json().catch(() => ({}))
+        this.users = response.ok ? (data.users || []) : []
+      } catch {
+        this.users = []
+      } finally {
+        this.loadingUsers = false
+      }
+    },
+
     async onProjectChange() {
       this.localFilters.projectMeetingId = null
       await this.fetchMeetingsForProject()
@@ -247,6 +292,7 @@ export default {
         taskStatus: null,
         priority: null,
         projectId: null,
+        assignedTo: null,
         projectMeetingId: null,
         submission_date_from: null,
         submission_date_to: null,

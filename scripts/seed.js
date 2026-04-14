@@ -49,6 +49,7 @@ const createMigrations = [
   '004_create_projects.sql',
   '005_create_tasks.sql',
   '008_create_project_meetings.sql',
+  '013_add_progress_percent_to_tasks.sql',
 ];
 
 for (const m of createMigrations) {

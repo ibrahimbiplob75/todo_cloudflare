@@ -10,6 +10,7 @@
         <div class="task_meta">
           {{ submissionDateFormatted }}
           {{ projectPart }},
+          <span v-if="task.assigneeName"> assigned: {{ task.assigneeName }}, </span>
           <span class="text-green-500">
             {{ task.taskStatus }}
           </span>

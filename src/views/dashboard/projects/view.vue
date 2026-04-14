@@ -4,6 +4,7 @@
       <h1 class="text-3xl font-bold text-gray-800">Project Details</h1>
       <div class="flex gap-2">
         <router-link
+          v-if="isWatcher"
           :to="{ name: 'project-update', params: { id: projectId } }"
           class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
         >
@@ -62,6 +63,7 @@
 
       <div class="mt-6 pt-6 border-t border-gray-200">
         <button
+          v-if="isWatcher"
           @click="confirmDelete"
           class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
         >
@@ -75,6 +77,7 @@
 
 <script>
 import { useProjectStore } from '@stores/project'
+import { useAuthStore } from '@stores/auth'
 
 export default {
   name: 'ProjectViewView',
@@ -90,6 +93,12 @@ export default {
     },
     projectStore() {
       return useProjectStore()
+    },
+    authStore() {
+      return useAuthStore()
+    },
+    isWatcher() {
+      return this.authStore.isWatcher
     },
     project() {
       return this.projectStore.currentProject || this.projectStore.getProjectById(this.projectId)
