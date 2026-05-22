@@ -9,6 +9,8 @@ export async function handleAuthRoutes(request, prisma, corsHeaders, env = {}) {
 	const pathname = url.pathname;
 	const method = request.method;
 
+	console.log('[Auth Routes] Method:', method, 'Pathname:', pathname);
+
 	// POST /auth/login - User login
 	if (pathname === "/auth/login" && method === 'POST') {
 		try {

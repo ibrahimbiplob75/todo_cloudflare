@@ -6,6 +6,7 @@ import { handleAuthRoutes } from './routes/authRoutes.js';
 import { handleProjectRoutes } from './routes/projectRoutes.js';
 import { handleTaskRoutes } from './routes/taskRoutes.js';
 import { handleMeetingRoutes } from './routes/meetingRoutes.js';
+import { handleRevenueRoutes } from './routes/revenueRoutes.js';
 
 export default {
 	async fetch(request, env) {
@@ -22,6 +23,8 @@ export default {
 		if (request.method === 'OPTIONS') {
 			return new Response(null, { headers: corsHeaders });
 		}
+
+		console.log('[Server] Request:', request.method, new URL(request.url).pathname);
 
 		// Try to handle routes in order
 		// Each route handler returns a Response if matched, or null if not matched
@@ -50,7 +53,11 @@ export default {
 		const meetingResponse = await handleMeetingRoutes(request, prisma, corsHeaders, env);
 		if (meetingResponse) return meetingResponse;
 
-		// 7. Todo routes
+		// 7. Revenue routes
+		const revenueResponse = await handleRevenueRoutes(request, prisma, corsHeaders, env);
+		if (revenueResponse) return revenueResponse;
+
+		// 8. Todo routes
 		const todoResponse = await handleTodoRoutes(request, prisma, corsHeaders);
 		if (todoResponse) return todoResponse;
 

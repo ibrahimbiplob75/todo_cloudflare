@@ -17,6 +17,7 @@ export const useAuthStore = defineStore('auth', {
   actions: {
     async login(email, password) {
       try {
+        console.log('[Auth] Attempting login for:', email);
         const response = await fetch('/auth/login', {
           method: 'POST',
           headers: {
@@ -25,12 +26,15 @@ export const useAuthStore = defineStore('auth', {
           body: JSON.stringify({ email, password }),
         })
 
+        console.log('[Auth] Response status:', response.status, 'Content-Type:', response.headers.get('content-type'));
+        const responseText = await response.text();
+        console.log('[Auth] Response text:', responseText.substring(0, 200));
+
         if (!response.ok) {
-          const error = await response.json()
-          throw new Error(error.error || 'Login failed')
+          throw new Error(responseText || 'Login failed')
         }
 
-        const data = await response.json()
+        const data = JSON.parse(responseText);
         
         this.user = data.user
         this.token = data.token

@@ -76,6 +76,7 @@ export default {
 
       if (this.isWatcher) {
         items.push({ name: 'users', label: 'Users', to: '/users', icon: 'fa-users', disabled: false })
+        items.push({ name: 'revenue-settings', label: 'Revenue Settings', to: '/revenue/settings', icon: 'fa-money-bill-wave', disabled: false })
       }
 
       return items

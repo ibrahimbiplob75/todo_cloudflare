@@ -23,6 +23,7 @@ export default defineConfig({
 			'@components': fileURLToPath(new URL('./src/components', import.meta.url)),
 			'@views': fileURLToPath(new URL('./src/views', import.meta.url)),
 			'@layouts': fileURLToPath(new URL('./src/layouts', import.meta.url)),
+			'@utils': fileURLToPath(new URL('./src/utils', import.meta.url)),
 			'.prisma/client/default': resolve(process.cwd(), 'node_modules/.prisma/client/default.js'),
 		},
 		dedupe: ['@prisma/client'],

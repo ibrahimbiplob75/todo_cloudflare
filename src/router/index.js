@@ -119,6 +119,18 @@ const router = createRouter({
       meta: { middleware: 'private', layout: 'private', requiresWatcher: true },
     },
     {
+      path: '/revenue/settings',
+      name: 'revenue-settings',
+      component: () => import('@components/revenue/RevenueSettingsPage.vue'),
+      meta: { middleware: 'private', layout: 'private', requiresWatcher: true },
+    },
+    {
+      path: '/project/:id/revenue',
+      name: 'project-revenue',
+      component: () => import('@components/revenue/ProjectRevenueView.vue'),
+      meta: { middleware: 'private', layout: 'private' },
+    },
+    {
       path: '/meetings',
       name: 'meetings-list',
       component: () => import('@views/dashboard/meetings/list.vue'),

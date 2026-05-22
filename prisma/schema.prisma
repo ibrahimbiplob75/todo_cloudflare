@@ -97,3 +97,90 @@ model Meeting {
   @@index([date])
   @@index([slug])
 }
+
+// ==================== REVENUE MANAGEMENT ====================
+
+model RevenueSettings {
+  id                    Int      @id @default(autoincrement())
+  quotationPercentage   Float    @default(2.0) @map("quotation_percentage")
+  marketingPercentage   Float    @default(5.0) @map("marketing_percentage")
+  graphicsPercentage    Float    @default(5.0) @map("graphics_percentage")
+  clientHuntPercentage  Float    @default(5.0) @map("client_hunt_percentage")
+  qaPercentage          Float    @default(8.0) @map("qa_percentage")
+  secondaryPercentage   Float    @default(10.0) @map("secondary_percentage")
+  corePercentage        Float    @default(25.0) @map("core_percentage")
+  reservePercentage     Float    @default(40.0) @map("reserve_percentage")
+  updatedBy             Int?     @map("updated_by")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  @@map("revenue_settings")
+}
+
+model ProjectRevenue {
+  id          Int      @id @default(autoincrement())
+  projectId   Int      @unique @map("project_id")
+  totalAmount Float    @map("total_amount")
+  expense     Float    @default(0.0)
+  netRevenue  Float    @map("net_revenue")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  assignments RevenueAssignment[]
+  history     RevenueHistory[]
+
+  @@map("project_revenues")
+  @@index([projectId])
+}
+
+model RevenueAssignment {
+  id              Int      @id @default(autoincrement())
+  projectId       Int      @map("project_id")
+  projectRevenue  ProjectRevenue @relation(fields: [projectRevenueId], references: [id], onDelete: Cascade)
+  projectRevenueId Int     @map("project_revenue_id")
+  role            String   // quotation, marketing, graphics, client_hunt, qa, secondary, core
+  isUnused        Boolean  @default(false) @map("is_unused") // If role not used, amount goes to reserve
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  members         RevenueMember[]
+
+  @@map("revenue_assignments")
+  @@index([projectId])
+  @@index([projectRevenueId])
+  @@unique([projectRevenueId, role])
+}
+
+model RevenueMember {
+  id                  Int      @id @default(autoincrement())
+  revenueAssignment   RevenueAssignment @relation(fields: [revenueAssignmentId], references: [id], onDelete: Cascade)
+  revenueAssignmentId Int      @map("revenue_assignment_id")
+  userId              Int      @map("user_id")
+  sharePercentage     Float    @default(0.0) @map("share_percentage") // 0-100
+  amountEarned        Float    @default(0.0) @map("amount_earned")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@map("revenue_members")
+  @@index([revenueAssignmentId])
+  @@index([userId])
+}
+
+model RevenueHistory {
+  id              Int      @id @default(autoincrement())
+  projectId       Int      @map("project_id")
+  projectRevenue  ProjectRevenue @relation(fields: [projectRevenueId], references: [id], onDelete: Cascade)
+  projectRevenueId Int     @map("project_revenue_id")
+  changeType      String   // "amount_change", "expense_change", "assignment_change", "settings_change"
+  oldData         String?  @map("old_data") // JSON string
+  newData         String?  @map("new_data") // JSON string
+  changedBy       Int      @map("changed_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("revenue_history")
+  @@index([projectId])
+  @@index([projectRevenueId])
+  @@index([createdAt])
+}
